@@ -1,0 +1,65 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ArcGIS defaultAssembly="LFTFC_Pro.dll" defaultNamespace="LFTFC_Pro" xmlns="http://schemas.esri.com/DADF/Registry" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schemas.esri.com/DADF/Registry file:///C:/Program%20Files/ArcGIS/Pro/bin/ArcGIS.Desktop.Framework.xsd">
+  <AddInInfo id="{da5c9e2f-51ef-47a1-a8dc-df4350422e4f}" version="3.0" desktopVersion="3.1.41833">
+    <Name>LFTFC_Pro</Name>
+    <Description>Facilitates editing LF rule sets to create customized surface and canopy fuel layers for local applications.</Description>
+    <Image>Images\AddinDesktop32.png</Image>
+    <Author>TobinSmail USDA USFS RMRS FMI, Michelle Hawks FS-FSIC-Enterprise Program</Author>
+    <Company>LANDFIRE Interagency Program</Company>
+    <Date>12/23/2025 9:07:28 AM</Date>
+    <!-- Note subject can be one or more of these topics:
+                    Content, Framework, Editing, Geodatabase, Geometry, Geoprocessing, Layouts, Map Authoring, Map Exploration -->
+  </AddInInfo>
+  <modules>
+    <insertModule id="LFTFC_Pro_Module" className="Module1" autoLoad="false" caption="Module1">
+      <!-- uncomment to have the control hosted on a separate tab-->
+      <tabs>
+        <!--<tab id="LFTFC_Pro_Tab1" caption="New Tab">
+          <group refID="LFTFC_Pro_Group1"/>
+        </tab>-->
+      </tabs>
+      <groups>
+        <!-- comment this out if you have no controls on the Addin tab to avoid
+              an empty group-->
+        <group id="LFTFC_Pro_Group1" caption="LFTFC_Pro" appearsOnAddInTab="true">
+          <!-- host controls within groups -->
+          <button refID="LFTFC_Pro_BWorkingDir" size="large" />
+          <button refID="LFTFC_Pro_BAMU" size="large" />
+          <comboBox refID="LFTFC_Pro_BCMU" size="large" />
+          <button refID="LFTFC_Pro_BDelete" size="large" />
+          <button refID="LFTFC_Pro_BRule" size="large" />
+          <button refID="LFTFC_Pro_BRaster" size="large" />
+          <button refID="LFTFC_Pro_BFuelLog" size="large" />
+          <button refID="LFTFC_Pro_BAbout" size="large" />
+        </group>
+      </groups>
+      <controls>
+        <!-- add your controls here -->
+        <button id="LFTFC_Pro_BWorkingDir" caption="Set the project path" className="BWorkingDir" loadOnClick="true" smallImage="Images/LFTFCTBWorkingDir.png" largeImage="Images/LFTFCTBWorkingDir.png">
+          <tooltip heading="Path"> Set the project path before doing anything else<disabledText /></tooltip>
+        </button>
+        <comboBox id="LFTFC_Pro_BCMU" caption="Selected MU" className="BCMU" itemWidth="140" extendedCaption="Extended Caption" isEditable="false" isReadOnly="true" resizable="true">
+          <tooltip heading="Selet MU">Select a Management Unit<disabledText /></tooltip>
+        </comboBox>
+        <button id="LFTFC_Pro_BAMU" caption="Make New MU" className="BAMU" loadOnClick="true" smallImage="Images/LFTFCTTAMU.png" largeImage="Images/LFTFCTTAMU.png">
+          <tooltip heading="Click to add new management unit (MU)"> Optional - Set extent to map view during creation.<disabledText /></tooltip>
+        </button>
+        <button id="LFTFC_Pro_BRule" caption="View Fuel Rules" className="BRule" loadOnClick="true" smallImage="Images/LFTFCTBRule.png" largeImage="Images/LFTFCTBRule.png">
+          <tooltip heading="Fuel Rules">View, Edit, Create, and Delete fuel rules<disabledText /></tooltip>
+        </button>
+        <button id="LFTFC_Pro_BRaster" caption="Make Fuel Rasters" className="BRaster" loadOnClick="true" smallImage="Images/LFTFCTBGRID.png" largeImage="Images/LFTFCTBGRID.png">
+          <tooltip heading="Fuel Rasters">Build Fuel Rasters<disabledText /></tooltip>
+        </button>
+        <button id="LFTFC_Pro_BDelete" caption="Delete Selected MU" className="BDelete" loadOnClick="true" smallImage="Images/LFTFCTBDelete.png" largeImage="Images/LFTFCTBDelete.png">
+          <tooltip heading="Delete MU">Delete selected manangement Unit<disabledText /></tooltip>
+        </button>
+        <button id="LFTFC_Pro_BFuelLog" caption="Make Fuel Log" className="BFuelLog" loadOnClick="true" smallImage="Images/LFTFCTBFuelLog.png" largeImage="Images/LFTFCTBFuelLog.png">
+          <tooltip heading="Log">Create a text file of all the changes made to this management unit rules<disabledText /></tooltip>
+        </button>
+        <button id="LFTFC_Pro_BAbout" caption="About LFTFC" className="BAbout" loadOnClick="true" smallImage="Images/LFTFCTBAbout.png" largeImage="Images/LFTFCTBAbout.png">
+          <tooltip heading="About">LFTFC version<disabledText /></tooltip>
+        </button>
+      </controls>
+    </insertModule>
+  </modules>
+</ArcGIS>
