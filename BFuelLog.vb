@@ -2,7 +2,7 @@
 Imports ArcGIS.Desktop.Framework.Contracts
 Imports ArcGIS.Desktop.Framework.Threading.Tasks
 
-Friend Class BFuleLog
+Friend Class BFuelLog
     Inherits Button
 
     Protected Overrides Sub OnClick()
