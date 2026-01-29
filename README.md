@@ -3,6 +3,10 @@ Source code for the LANDFIRE Total Fuel Change Tool
 
 Information and compiled ArcPro Addin available at: [LANDFIRE Resources](https://landfire.gov/resources/lftfc)
 
+## Changelog
+
+See the full release history and detailed updates in [UPDATES.md](UPDATES.md).
+
 ## Getting Started
 
 ### Prerequisites
