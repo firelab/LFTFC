@@ -44,10 +44,10 @@ To run and use the add-in, follow these steps:
 
 The project structure includes the following important files and directories:
 
-- `LF_TFC_Toolbar.mdb` — Project Access database used by the tool (copied into new projects from the install location).
-- `MU/` — Management unit rasters and generated MU-specific files.
-- `Input/` — Optional input rasters referenced when creating new MUs.
-- `Output/` — Exported rasters, logs, and reports produced by the add-in.
+- `LF_TFC_Toolbar.mdb` â€” Project Access database used by the tool (copied into new projects from the install location).
+- `MU/` â€” Management unit rasters and generated MU-specific files.
+- `Input/` â€” Optional input rasters referenced when creating new MUs.
+- `Output/` â€” Exported rasters, logs, and reports produced by the add-in.
 
 ### Notes
 
@@ -56,5 +56,5 @@ The project structure includes the following important files and directories:
 
 ### License
 
-See the `LICENSE` file for licensing information.
+See the [LICENSE.md](LICENSE.md) file for licensing information.
 
