@@ -34,7 +34,7 @@ To run and use the add-in, follow these steps:
 2. From the add-in toolbar, set a working project directory using the "Set Working Directory" button. The add-in will create the following subfolders in the project path if they are missing: `Input`, `MU`, `Output`, and it will copy `LF_TFC_Toolbar.mdb`.
 3. Add Management Units (MU) via the UI; generated grids and outputs are written into the project's `MU` and `Output` folders.
 4. Use the various tool functions to manipulate and analyze fuel data as needed.
-5.Information and compiled ArcPro Addin available at: [LANDFIRE Resources](https://landfire.gov/resources/lftfc)
+5. Information and compiled ArcPro Addin available at: [LANDFIRE Resources](https://landfire.gov/resources/lftfc)
 
 ### Project Layout and Important Files
 
