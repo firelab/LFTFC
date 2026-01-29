@@ -93,7 +93,7 @@ Friend Class BFuelLog
 
                        If preEVTDist <> (rs1.Fields!EVT.Value & "") Then
                            preEVTDist = rs1.Fields!EVT.Value & ""
-                           frmStatusLog.UpdateStatus("Writting FVT - " & rs1.Fields!EVT.Value)
+                           frmStatusLog.UpdateStatus("Writing FVT - " & rs1.Fields!EVT.Value)
                        End If
                        oWrite.WriteLine(GetEVTName(rs1.Fields!EVT.Value, strProjectPath) &
                          "," & rs1.Fields!DIST.Value &
