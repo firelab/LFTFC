@@ -1,5 +1,5 @@
 # LFTFC
-Source code for the LANDFIRE Total Fuel Change ArcPro Add-in
+Source code for the LANDFIRE Total Fuel Change Tool
 
 Information and compiled ArcPro Addin available at: [LANDFIRE Resources](https://landfire.gov/resources/lftfc)
 
@@ -54,7 +54,7 @@ The project structure includes the following important files and directories:
 - The implementation uses ADODB to read/write the Access MDB and relies on Access being available for certain operations. On developer machines, use the 64-bit Access components to match the add-in process.
 - The install path constant in the code is `C:\Landfire\LFTFC_Pro`. Some helper routines reference this path; verify and update if needed.
 
-### LFTFC Process image
+### License
 
-<img width="1552" height="806" alt="LF_LFTFC" src="https://github.com/user-attachments/assets/43035afd-01fe-4b60-9907-bfc746008688" />
+See the [LICENSE.md](LICENSE.md) file for licensing information.
 
