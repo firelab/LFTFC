@@ -54,7 +54,3 @@ The project structure includes the following important files and directories:
 - The implementation uses ADODB to read/write the Access MDB and relies on Access being available for certain operations. On developer machines, use the 64-bit Access components to match the add-in process.
 - The install path constant in the code is `C:\Landfire\LFTFC_Pro`. Some helper routines reference this path; verify and update if needed.
 
-### License
-
-See the [LICENSE.md](LICENSE.md) file for licensing information.
-
