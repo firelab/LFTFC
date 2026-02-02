@@ -14,8 +14,8 @@
 *.userprefs
 
 # Additional debugger setting files
-Application.myapp
-launchSettings.json
+My Project/Application.myapp
+My Project/launchSettings.json
 
 # Mono auto generated files
 mono_crash.*
