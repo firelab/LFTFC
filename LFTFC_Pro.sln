@@ -7,6 +7,8 @@ Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "LFTFC_Pro", "LFTFC_Pro.vbpr
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{5C1D863D-55F8-429E-BF78-66B6EF8EB464}"
 	ProjectSection(SolutionItems) = preProject
+		.gitattributes = .gitattributes
+		.gitignore = .gitignore
 		LICENSE = LICENSE
 		README.md = README.md
 		UPDATES.md = UPDATES.md
