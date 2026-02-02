@@ -17,7 +17,7 @@ Before you begin, ensure you have the following software installed:
 - **ArcGIS Pro SDK for .NET**: This should be installed in Visual Studio.
 - **Visual Studio 2022**: Make sure you have the VB.NET workload installed.
 - **Microsoft Access (64-bit)**: Required for Access database (`LF_TFC_Toolbar.mdb`) and to run features that manipulate the MDB directly.
-- **The current Access Database can be found at:**: [LANDFIRE Resources](https://landfire.gov/resources/lftfc) in the setup file.
+- **The current Access Database can be found at**: [LANDFIRE Resources](https://landfire.gov/resources/lftfc) in the setup file.
 
 ### Build
 
