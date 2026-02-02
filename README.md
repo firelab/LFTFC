@@ -9,6 +9,11 @@ See the full release history and detailed updates in [UPDATES.md](UPDATES.md).
 
 ## Getting Started
 
+Directories:
+libs -> dynamic link librarys (DDLs)
+images -> images for icons
+src -> source files
+
 ### Prerequisites
 
 Before you begin, ensure you have the following software installed:
