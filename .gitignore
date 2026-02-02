@@ -13,9 +13,9 @@
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
-# Additional debugger folders
-LFTFC\Pro/
-My\Project/
+# Additional debugger setting files
+Application.myapp
+launchSettings.json
 
 # Mono auto generated files
 mono_crash.*
