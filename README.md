@@ -58,3 +58,6 @@ The project structure includes the following important files and directories:
 
 See the [LICENSE](LICENSE) file for licensing information.
 
+LFTFC Process Image
+<img width="1004" height="505" alt="image" src="https://github.com/user-attachments/assets/de12e9c2-efdd-48de-a426-20b02c63521f" />
+
