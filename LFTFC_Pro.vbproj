@@ -50,7 +50,7 @@
     </COMReference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Config.daml" />
+    <Content Include="src\Config.daml" />
     <Resource Include="Images\AddInDesktop16.png" />
     <Resource Include="Images\AddInDesktop32.png" />
     <Content Include="Images\LFTFCTBAbout.png" />
@@ -96,10 +96,10 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <None Update="System.Windows.Forms.DataVisualization.Design.dll">
+    <None Update="libs\System.Windows.Forms.DataVisualization.Design.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="System.Windows.Forms.DataVisualization.dll">
+    <None Update="libs\System.Windows.Forms.DataVisualization.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>

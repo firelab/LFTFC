@@ -14,8 +14,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		UPDATES.md = UPDATES.md
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -31,7 +29,7 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{E48CF9A6-4AE4-4BC9-9F61-566737D3807B} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{E48CF9A6-4AE4-4BC9-9F61-566737D3807B} = {5C1D863D-55F8-429E-BF78-66B6EF8EB464}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {180F95CC-7A34-4F9C-9AC5-A986E2118E0B}
