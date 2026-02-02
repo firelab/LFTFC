@@ -7,12 +7,16 @@ Information and compiled ArcPro Addin available at: [LANDFIRE Resources](https:/
 
 See the full release history and detailed updates in [UPDATES.md](UPDATES.md).
 
-## Getting Started
+## License
 
-### Directories:
+See the [LICENSE](LICENSE) file for licensing information.
+
+## Directories:
 - libs -> dynamic link librarys (DDLs)
 - images -> images for icons
 - src -> source files
+
+## Getting Started
 
 ### Prerequisites
 
@@ -58,10 +62,6 @@ The project structure includes the following important files and directories:
 
 - The implementation uses ADODB to read/write the Access MDB and relies on Access being available for certain operations. On developer machines, use the 64-bit Access components to match the add-in process.
 - The install path constant in the code is `C:\Landfire\LFTFC_Pro`. Some helper routines reference this path; verify and update if needed.
-
-### License
-
-See the [LICENSE](LICENSE) file for licensing information.
 
 LFTFC Process Image
 <img width="1004" height="505" alt="image" src="https://github.com/user-attachments/assets/de12e9c2-efdd-48de-a426-20b02c63521f" />
