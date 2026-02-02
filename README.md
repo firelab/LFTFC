@@ -56,5 +56,5 @@ The project structure includes the following important files and directories:
 
 ### License
 
-See the [LICENSE.md](LICENSE.md) file for licensing information.
+See the [LICENSE](LICENSE) file for licensing information.
 
