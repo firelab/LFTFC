@@ -21,12 +21,6 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="My Project\**" />
-    <EmbeddedResource Remove="My Project\**" />
-    <None Remove="My Project\**" />
-    <Page Remove="My Project\**" />
-  </ItemGroup>
-  <ItemGroup>
     <None Remove="Images\LFTFCTBAbout.png" />
     <None Remove="Images\LFTFCTBColor.png" />
     <None Remove="Images\LFTFCTBDelete.png" />
