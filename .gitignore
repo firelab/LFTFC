@@ -16,7 +16,7 @@
 # Mono auto generated files
 mono_crash.*
 
-# Folder to run ArcPro during debugging the Add-in
+# Folder to load ArcPro during debugging the Add-in
 My Project/
 
 # Build results
