@@ -2,7 +2,7 @@
 Imports System.Data
 Imports System.Drawing
 Imports System.Windows.Forms
-Imports System.Windows.Forms.DataVisualization.Charting
+Imports FastReport.DataVisualization.Charting
 
 Public Class frmRule
     Private strSQL As String                                                        'SQL variable for this module
@@ -15,8 +15,8 @@ Public Class frmRule
     Private strAutoRuleSF As String                                                 'Stores the autorule surface fuel name
     Private strCMSItem As String                                                    'Stores the list box column item when right click rule
     Private ruleE As clsRule                                                        'The selected rule to Edit
-    Private chrtDist As System.Windows.Forms.DataVisualization.Charting.Chart
-    Private chrtCompFM As System.Windows.Forms.DataVisualization.Charting.Chart
+    Private chrtDist As Chart
+    Private chrtCompFM As Chart
     Private startIntervalMarque As Date = Date.Now                                  'Stores start time
 
     Public Sub New(ByVal setComboR As String, ByVal setRulesR As String, ByVal SetMUName As String)
@@ -1093,7 +1093,7 @@ Public Class frmRule
     End Function
 
     Sub CreateChrtDist()
-        chrtDist = New System.Windows.Forms.DataVisualization.Charting.Chart()
+        chrtDist = New Chart
 
         ' Set chart control location & size
         chrtDist.Location = New System.Drawing.Point(0, 150)
@@ -1103,7 +1103,7 @@ Public Class frmRule
         DistributionGraph.Controls.AddRange(New System.Windows.Forms.Control() {chrtDist})
 
         ' Add Chart Area to the Chart
-        Dim chrtArea As New System.Windows.Forms.DataVisualization.Charting.ChartArea()
+        Dim chrtArea As New ChartArea
         chrtDist.ChartAreas.Add(chrtArea)
 
         'Set ChartAdd a title to the chart
@@ -1154,10 +1154,10 @@ Public Class frmRule
     Sub CreateChrtCompFM()
         Dim strROSFLCBH As String 'Stores output type units
 
-        chrtCompFM = New System.Windows.Forms.DataVisualization.Charting.Chart()
+        chrtCompFM = New Chart
 
         ' Add Chart Area to the Chart
-        Dim chrtArea As New System.Windows.Forms.DataVisualization.Charting.ChartArea()
+        Dim chrtArea As New ChartArea
         chrtCompFM.ChartAreas.Add(chrtArea)
 
         ' Set chart control location & size

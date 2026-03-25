@@ -64,6 +64,9 @@
     <Content Include="Images\LFTFCTTAMU.png" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="FastReport.DataVisualization" Version="2026.1.3" />
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="ArcGIS.Core">
       <HintPath>C:\Program Files\ArcGIS\Pro\bin\ArcGIS.Core.dll</HintPath>
       <CopyLocal>False</CopyLocal>
@@ -84,14 +87,6 @@
     <Reference Include="ArcGIS.Desktop.Mapping">
       <HintPath>C:\Program Files\ArcGIS\Pro\bin\Extensions\Mapping\ArcGIS.Desktop.Mapping.dll</HintPath>
       <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Windows.Forms.DataVisualization">
-      <HintPath>System.Windows.Forms.DataVisualization.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System.Windows.Forms.DataVisualization.Design">
-      <HintPath>System.Windows.Forms.DataVisualization.Design.dll</HintPath>
-      <Private>True</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>
