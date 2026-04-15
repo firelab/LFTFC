@@ -1454,7 +1454,6 @@ Public Class frmRule
                                     cA += CShort(1)
                                     If rs1.EOF = False Then rs1.MoveNext()
                                 Else
-                                    Debug.Write("***********    " & retryCount)
                                     retryCount += 1
                                 End If
                                 'Do nothing sometimes there is an unexpected error. Rerun the loop with the same values
@@ -1537,7 +1536,7 @@ Public Class frmRule
 
             If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
             dbconn = Nothing
-            MsgBox("Retry count " & retryCount & " " & ex.Message)
+            MsgBox("DistGraph " & ex.Message)
         End Try
     End Sub
 
