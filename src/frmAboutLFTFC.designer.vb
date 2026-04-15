@@ -34,10 +34,10 @@ Partial Class frmAboutLFTFC
         ' OK_Button
         ' 
         OK_Button.Anchor = System.Windows.Forms.AnchorStyles.None
-        OK_Button.Location = New System.Drawing.Point(112, 373)
-        OK_Button.Margin = New System.Windows.Forms.Padding(4, 3, 4, 3)
+        OK_Button.Location = New System.Drawing.Point(128, 497)
+        OK_Button.Margin = New System.Windows.Forms.Padding(5, 4, 5, 4)
         OK_Button.Name = "OK_Button"
-        OK_Button.Size = New System.Drawing.Size(78, 27)
+        OK_Button.Size = New System.Drawing.Size(89, 36)
         OK_Button.TabIndex = 0
         OK_Button.Text = "OK"
         ' 
@@ -50,10 +50,10 @@ Partial Class frmAboutLFTFC
         Pan.Controls.Add(lblVersion)
         Pan.Controls.Add(lblTitle)
         Pan.Font = New System.Drawing.Font("Comic Sans MS", 9.75F)
-        Pan.Location = New System.Drawing.Point(1, 2)
-        Pan.Margin = New System.Windows.Forms.Padding(4, 3, 4, 3)
+        Pan.Location = New System.Drawing.Point(1, 3)
+        Pan.Margin = New System.Windows.Forms.Padding(5, 4, 5, 4)
         Pan.Name = "Pan"
-        Pan.Size = New System.Drawing.Size(483, 363)
+        Pan.Size = New System.Drawing.Size(552, 484)
         Pan.TabIndex = 1
         ' 
         ' lblDeveloper
@@ -61,20 +61,20 @@ Partial Class frmAboutLFTFC
         lblDeveloper.AutoSize = True
         lblDeveloper.BackColor = Drawing.Color.Transparent
         lblDeveloper.Font = New System.Drawing.Font("Comic Sans MS", 6.75F)
-        lblDeveloper.Location = New System.Drawing.Point(28, 65)
-        lblDeveloper.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
+        lblDeveloper.Location = New System.Drawing.Point(32, 87)
+        lblDeveloper.Margin = New System.Windows.Forms.Padding(5, 0, 5, 0)
         lblDeveloper.Name = "lblDeveloper"
-        lblDeveloper.Size = New System.Drawing.Size(221, 52)
+        lblDeveloper.Size = New System.Drawing.Size(291, 68)
         lblDeveloper.TabIndex = 3
-        lblDeveloper.Text = "LANDFIRE Interagency Program (Fuel)" & vbCrLf & "Ver. 4.03 ArcPro 3" & vbCrLf & "Dev: Tobin Smail USFS RMRS FMI LANDFIRE" & vbCrLf & "        Michelle Hawks FS-FSIC-Enterprise Program" & vbCrLf
+        lblDeveloper.Text = "LANDFIRE Interagency Program (Fuel)" & vbCrLf & "Ver. 4.04 ArcPro 3" & vbCrLf & "Dev: Tobin Smail USFS RMRS FMI LANDFIRE" & vbCrLf & "        Michelle Hawks FS-FSIC-Enterprise Program" & vbCrLf
         ' 
         ' lblVersion
         ' 
         lblVersion.AutoSize = True
-        lblVersion.Location = New System.Drawing.Point(54, 36)
-        lblVersion.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
+        lblVersion.Location = New System.Drawing.Point(62, 48)
+        lblVersion.Margin = New System.Windows.Forms.Padding(5, 0, 5, 0)
         lblVersion.Name = "lblVersion"
-        lblVersion.Size = New System.Drawing.Size(184, 18)
+        lblVersion.Size = New System.Drawing.Size(239, 24)
         lblVersion.TabIndex = 1
         lblVersion.Text = "(Landfire Total Fuel Change)"
         ' 
@@ -82,25 +82,25 @@ Partial Class frmAboutLFTFC
         ' 
         lblTitle.AutoSize = True
         lblTitle.Font = New System.Drawing.Font("Comic Sans MS", 18F)
-        lblTitle.Location = New System.Drawing.Point(89, 7)
-        lblTitle.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
+        lblTitle.Location = New System.Drawing.Point(102, 9)
+        lblTitle.Margin = New System.Windows.Forms.Padding(5, 0, 5, 0)
         lblTitle.Name = "lblTitle"
-        lblTitle.Size = New System.Drawing.Size(95, 33)
+        lblTitle.Size = New System.Drawing.Size(118, 42)
         lblTitle.TabIndex = 0
         lblTitle.Text = "LF TFC"
         ' 
         ' frmAboutLFTFC
         ' 
         AcceptButton = OK_Button
-        AutoScaleDimensions = New System.Drawing.SizeF(7F, 15F)
+        AutoScaleDimensions = New System.Drawing.SizeF(8F, 20F)
         AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         BackColor = Drawing.SystemColors.ScrollBar
-        ClientSize = New System.Drawing.Size(285, 413)
+        ClientSize = New System.Drawing.Size(326, 551)
         Controls.Add(OK_Button)
         Controls.Add(Pan)
         FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog
         Icon = CType(resources.GetObject("$this.Icon"), Drawing.Icon)
-        Margin = New System.Windows.Forms.Padding(4, 3, 4, 3)
+        Margin = New System.Windows.Forms.Padding(5, 4, 5, 4)
         MaximizeBox = False
         MinimizeBox = False
         Name = "frmAboutLFTFC"

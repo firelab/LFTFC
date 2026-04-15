@@ -11,8 +11,4 @@
         DialogResult = System.Windows.Forms.DialogResult.OK
         Close()
     End Sub
-
-    Private Sub lblDeveloper_Click(sender As Object, e As EventArgs) Handles lblDeveloper.Click
-
-    End Sub
 End Class

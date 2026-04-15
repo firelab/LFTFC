@@ -11,7 +11,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <MyType>WindowsForms</MyType>
     <StartupObject>LFTFC_Pro.My.MyApplication</StartupObject>
-    <Version>4.0.3</Version>
+    <Version>4.0.4</Version>
     <NuGetAuditMode>all</NuGetAuditMode>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
