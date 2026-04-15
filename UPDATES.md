@@ -1,6 +1,8 @@
 # LFTFC — Changelog
 
 All notable changes to LFTFC_Pro. Entries are listed newest first. Dates use ISO format (YYYY-MM-DD).
+Branches are the versions and main is development.
+
 ## v4.04 — 2026-04-15
 - Fix: Resolved unexpecteded error in 'DistGraph' when viewing the distribution line graphs.
 - Includes earlier changes.
