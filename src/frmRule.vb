@@ -1,7 +1,9 @@
 ﻿'System.Windows.Forms.DataVisualization.Charting
 Imports System.Data
 Imports System.Drawing
+Imports System.Threading
 Imports System.Windows.Forms
+Imports ArcGIS.Desktop.Mapping.Events
 Imports FastReport.DataVisualization.Charting
 
 Public Class frmRule
@@ -616,6 +618,7 @@ Public Class frmRule
 
                         grpCanopyLines.Visible = True    'Show the group cbh cbd option
 
+                        rdoNoneDistGraph.Checked = True 'Set to none when changes occur
                         DistGraph()                     'Create the graph
 
                     ElseIf TabControl.SelectedIndex = 3 Then
@@ -1215,34 +1218,39 @@ Public Class frmRule
         Dim rs1 As New ADODB.Recordset                                  'recordset for data
         Dim rs2 As New ADODB.Recordset                                  'recordset for data
 
+        Dim err As String = ""                                          'Used to store any errors that occur   
+
         Dim dbconn As New ADODB.Connection                              'DB connection
         dbconn.ConnectionString = gs_DBConnection &
         strProjectPath & "\" & gs_LFTFCDBName
         dbconn.Open()
 
-        Try
-            Dim CanopySel As String              'Flag for CBH or CBD to be displayed in graph
-            Dim Series1Index As Integer         'Stores the starting series index for the cbh and cbd series
-            Dim SeriesEqual As Boolean = True   'Stores if series is equal or not
 
+        Dim CanopySel As String             'Flag for CBH or CBD to be displayed in graph
+        Dim Series1Index As Integer         'Stores the starting series index for the cbh and cbd series
+        Dim SeriesEqual As Boolean = True   'Stores if series is equal or not
+
+        Dim retryCount As Integer = 0   'Count of number of times loop has been rerun for same values due to an error.
+
+        Try
             If rdoNoneDistGraph.Checked Then
                 CanopySel = "None"                                          'Neither selected, do not show line graph
             ElseIf rdoCCDistGraph.Checked Then
                 chrtDist.ChartAreas(0).AxisY2.Title = "% CC in Dist code -  " &
-                    gf_GetNum(cmbEVT.SelectedItem, "DIST")              'Set Y2 Axis title
+                    gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST")              'Set Y2 Axis title
                 CanopySel = "Cover"                                         'Cover selected, show CC line graph
             ElseIf rdoCHDistGraph.Checked Then
                 chrtDist.ChartAreas(0).AxisY2.Title = "CH(m) in Dist code -  " &
-                    gf_GetNum(cmbEVT.SelectedItem, "DIST")              'Set Y2 Axis title
+                    gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST")              'Set Y2 Axis title
                 CanopySel = "Height"                                        'Height selected, show CH line graph
             ElseIf rdoCBHDistGraph.Checked Then
                 chrtDist.ChartAreas(0).AxisY2.Title = "CBH(m) in Dist code -  " &
-                    gf_GetNum(cmbEVT.SelectedItem, "DIST")              'Set Y2 Axis title
+                    gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST")              'Set Y2 Axis title
                 CanopySel = "CBH"                                           'CBH selected, show CBH line graph
             Else
                 CanopySel = "CBD"                                           'CBD selected, show CBD line graph
                 chrtDist.ChartAreas(0).AxisY2.Title = "CBD(kg/m^3) in Dist code -  " &
-                    gf_GetNum(cmbEVT.SelectedItem, "DIST")              'Set Y2 Axis title
+                    gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST")              'Set Y2 Axis title
             End If
 
             Dim itemCounter As Integer = 1
@@ -1258,7 +1266,7 @@ Public Class frmRule
             rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
 
             If rs1.EOF = False Then
-                treeCounter = rs1.Fields!CountOfLifeform.Value
+                treeCounter = CInt(rs1.Fields!CountOfLifeform.Value)
             End If
             rs1.Close()
 
@@ -1270,28 +1278,25 @@ Public Class frmRule
 
             itemCounter = 1
 
-            Dim hgtArray(rs1.RecordCount + treeCounter) As Object
+            Dim hgtArray(CInt(rs1.RecordCount) + treeCounter) As Object
 
             Do While rs1.EOF() <> True
-
-                If rs1.Fields!Lifeform.Value = "Tree" Then
+                If rs1.Fields!Lifeform.Value.ToString = "Tree" Then
                     'Canopy
-                    hgtArray(itemCounter) = Mid(rs1.Fields!LowName.Value, 1, Len(rs1.Fields!LowName.Value) - 1) &
-                                                            Trim(Mid(rs1.Fields!HighName.Value, 1, Len(rs1.Fields!HighName.Value) - 5))
-                    hgtArray(itemCounter + treeCounter) = Mid(rs1.Fields!LowName.Value, 1, Len(rs1.Fields!LowName.Value) - 1) &
-                                                            Trim(Mid(rs1.Fields!HighName.Value, 1, Len(rs1.Fields!HighName.Value) - 5))
+                    hgtArray(itemCounter) = Mid(rs1.Fields!LowName.Value.ToString, 1, Len(rs1.Fields!LowName.Value) - 1) &
+                                                        Trim(Mid(rs1.Fields!HighName.Value.ToString, 1, Len(rs1.Fields!HighName.Value) - 5))
+                    hgtArray(itemCounter + treeCounter) = Mid(rs1.Fields!LowName.Value.ToString, 1, Len(rs1.Fields!LowName.Value) - 1) &
+                                                        Trim(Mid(rs1.Fields!HighName.Value.ToString, 1, Len(rs1.Fields!HighName.Value) - 5))
                 Else
                     'No Canopy
-                    hgtArray(itemCounter) = Mid(rs1.Fields!LowName.Value, 1, Len(rs1.Fields!LowName.Value) - 1) &
-                                                            Trim(Mid(rs1.Fields!HighName.Value, 1, Len(rs1.Fields!HighName.Value) - 5))
+                    hgtArray(itemCounter) = Mid(rs1.Fields!LowName.Value.ToString, 1, Len(rs1.Fields!LowName.Value) - 1) &
+                                                        Trim(Mid(rs1.Fields!HighName.Value.ToString, 1, Len(rs1.Fields!HighName.Value) - 5))
                 End If
-
                 itemCounter += 1
                 rs1.MoveNext()
             Loop
 
             rs1.Close()
-
             'This holds the values of acres by cover class for the yaxis plus 2 space holders
             Dim seriesArray(covArray.Length - 1) As Object
 
@@ -1305,50 +1310,50 @@ Public Class frmRule
 
             'Get EVHs
             strSQL = "SELECT LUT_Height.Lifeform, LUT_Height.EVH " &
-                 "FROM LUT_Height " &
-                 "WHERE(((LUT_Height.EVH) > 100)) " &
-                 "ORDER BY LUT_Height.EVH"
+                "FROM LUT_Height " &
+                "WHERE(((LUT_Height.EVH) > 100)) " &
+                "ORDER BY LUT_Height.EVH"
             rs2.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
 
             Do While hA <= hgtArray.Length - treeCounter - 1 'All the height + additional for canopy
                 Dim cA As Short
                 'Set seriesArray to 0s
-                For cA = 1 To covArray.Length - 1 'cA Counts the position in the series array used further down aswell
+                For cA = 1 To CShort(covArray.Length - 1) 'cA Counts the position in the series array used further down aswell
                     seriesArray(cA) = "0"
                 Next
 
-                evhCode = rs2.Fields!EVH.Value 'Set next evh code
+                evhCode = CInt(rs2.Fields!EVH.Value) 'Set next evh code
 
-                If IsNumeric(gf_GetNum(cmbBPSGraph.SelectedItem, "General")) Then 'BPS is numeric not 'any'
+                If IsNumeric(gf_GetNum(cmbBPSGraph.SelectedItem.ToString, "General")) Then 'BPS is numeric not 'any'
                     strSQL = "SELECT LUT_Height.Lifeform, " & comboR & ".EVHR, " & comboR & ".EVCR, " &
-                                "Sum(IIf(((" & comboR & ".EVTR=" & gf_GetNum(cmbEVT.SelectedItem, "EVT") & ") " &
-                                "And (" & comboR & ".DIST=" & gf_GetNum(cmbEVT.SelectedItem, "DIST") & ") " &
-                                "And (" & comboR & ".BPSRF = " & gf_GetNum(cmbBPSGraph.SelectedItem, "General") & ") " &
-                                "And (" & comboR & ".Wildcard = '" & cmbWildGraph.SelectedItem & "')) " &
-                                "Or ((" & comboR & ".EVTR=" & gf_GetNum(cmbEVT.SelectedItem, "EVT") & ") " &
-                                "And (" & comboR & ".DIST=" & gf_GetNum(cmbEVT.SelectedItem, "DIST") & ") " &
-                                "And (" & comboR & ".BPSRF = " & gf_GetNum(cmbBPSGraph.SelectedItem, "General") & ") " &
-                                "And ('" & cmbWildGraph.SelectedItem & "' = 'any')), " &
-                                "Round(" & comboR & ".COUNT * 0.2223948,0),0)) AS SUMCOUNT " &
-                                "FROM (LUT_Cover Inner JOIN " & comboR & " ON LUT_Cover.EVC = " & comboR & ".EVCR) " &
-                                "INNER JOIN LUT_Height ON " & comboR & ".EVHR = LUT_Height.EVH " &
-                                "GROUP BY LUT_Height.Lifeform, " & comboR & ".EVHR, " & comboR & ".EVCR " &
-                                "HAVING(((" & comboR & ".EVHR) = " & evhCode & ") And ((" & comboR & ".EVCR) > 100)) " &
-                                "ORDER BY " & comboR & ".EVCR"
+                    "Sum(IIf(((" & comboR & ".EVTR=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "EVT") & ") " &
+                    "And (" & comboR & ".DIST=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST") & ") " &
+                    "And (" & comboR & ".BPSRF = " & gf_GetNum(cmbBPSGraph.SelectedItem.ToString, "General") & ") " &
+                    "And (" & comboR & ".Wildcard = '" & cmbWildGraph.SelectedItem.ToString & "')) " &
+                    "Or ((" & comboR & ".EVTR=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "EVT") & ") " &
+                    "And (" & comboR & ".DIST=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST") & ") " &
+                    "And (" & comboR & ".BPSRF = " & gf_GetNum(cmbBPSGraph.SelectedItem.ToString, "General") & ") " &
+                    "And ('" & cmbWildGraph.SelectedItem.ToString & "' = 'any')), " &
+                    "Round(" & comboR & ".COUNT * 0.2223948,0),0)) AS SUMCOUNT " &
+                    "FROM (LUT_Cover Inner JOIN " & comboR & " ON LUT_Cover.EVC = " & comboR & ".EVCR) " &
+                    "INNER JOIN LUT_Height ON " & comboR & ".EVHR = LUT_Height.EVH " &
+                    "GROUP BY LUT_Height.Lifeform, " & comboR & ".EVHR, " & comboR & ".EVCR " &
+                    "HAVING(((" & comboR & ".EVHR) = " & evhCode & ") And ((" & comboR & ".EVCR) > 100)) " &
+                    "ORDER BY " & comboR & ".EVCR"
                 Else 'BPS is text it is 'any'
                     strSQL = "SELECT LUT_Height.Lifeform, " & comboR & ".EVHR, " & comboR & ".EVCR, " &
-                                "Sum(IIf(((" & comboR & ".EVTR=" & gf_GetNum(cmbEVT.SelectedItem, "EVT") & ") " &
-                                "And (" & comboR & ".DIST=" & gf_GetNum(cmbEVT.SelectedItem, "DIST") & ") " &
-                                "And (" & comboR & ".Wildcard = '" & cmbWildGraph.SelectedItem & "')) " &
-                                "Or ((" & comboR & ".EVTR=" & gf_GetNum(cmbEVT.SelectedItem, "EVT") & ") " &
-                                "And (" & comboR & ".DIST=" & gf_GetNum(cmbEVT.SelectedItem, "DIST") & ") " &
-                                "And ('" & cmbWildGraph.SelectedItem & "' = 'any')), " &
-                                "Round(" & comboR & ".COUNT*0.2223948,0),0)) AS SUMCOUNT " &
-                                "FROM (LUT_Cover Inner JOIN " & comboR & " ON LUT_Cover.EVC = " & comboR & ".EVCR) " &
-                                "INNER JOIN LUT_Height ON " & comboR & ".EVHR = LUT_Height.EVH " &
-                                "GROUP BY LUT_Height.Lifeform, " & comboR & ".EVHR, " & comboR & ".EVCR " &
-                                "HAVING(((" & comboR & ".EVHR) = " & evhCode & ") And ((" & comboR & ".EVCR) > 100)) " &
-                                "ORDER BY " & comboR & ".EVCR"
+                    "Sum(IIf(((" & comboR & ".EVTR=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "EVT") & ") " &
+                    "And (" & comboR & ".DIST=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST") & ") " &
+                    "And (" & comboR & ".Wildcard = '" & cmbWildGraph.SelectedItem.ToString & "')) " &
+                    "Or ((" & comboR & ".EVTR=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "EVT") & ") " &
+                    "And (" & comboR & ".DIST=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST") & ") " &
+                    "And ('" & cmbWildGraph.SelectedItem.ToString & "' = 'any')), " &
+                    "Round(" & comboR & ".COUNT*0.2223948,0),0)) AS SUMCOUNT " &
+                    "FROM (LUT_Cover Inner JOIN " & comboR & " ON LUT_Cover.EVC = " & comboR & ".EVCR) " &
+                    "INNER JOIN LUT_Height ON " & comboR & ".EVHR = LUT_Height.EVH " &
+                    "GROUP BY LUT_Height.Lifeform, " & comboR & ".EVHR, " & comboR & ".EVCR " &
+                    "HAVING(((" & comboR & ".EVHR) = " & evhCode & ") And ((" & comboR & ".EVCR) > 100)) " &
+                    "ORDER BY " & comboR & ".EVCR"
                 End If
 
                 rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
@@ -1358,8 +1363,8 @@ Public Class frmRule
                 cA = 1                              'Keeps track of what number is added to the series
                 Do Until rs1.EOF
                     seriesArray(cA) = rs1.Fields!SUMCOUNT.Value
-                    If seriesArray(cA) > 0 Then acreCheck = True
-                    cA += 1
+                    If CInt(seriesArray(cA)) > 0 Then acreCheck = True
+                    cA += CShort(1)
                     rs1.MoveNext()
                 Loop
                 rs1.Close()
@@ -1372,7 +1377,7 @@ Public Class frmRule
                     If rdoNoneDistGraph.Checked <> False Then
                         With oSeries
                             .YAxisType = AxisType.Primary
-                            .Name = hgtArray(hA)
+                            .Name = hgtArray(hA).ToString
                             'Set Data
                             .Points.DataBindXY(covArray, seriesArray)
                         End With
@@ -1380,7 +1385,7 @@ Public Class frmRule
                         'Add series to chart
                         chrtDist.Series.Add(oSeries)
 
-                        With chrtDist.Series(hgtArray(hA))
+                        With chrtDist.Series(CStr(hgtArray(hA)))
                             'Set series chart type
                             '.ChartType = SeriesChartType.Bar
                             .ChartType = SeriesChartType.StackedColumn
@@ -1390,49 +1395,70 @@ Public Class frmRule
                         End With
 
                         'Get canopy values for the series
-                    ElseIf rs2.Fields!Lifeform.Value = "Tree" And rdoNoneDistGraph.Checked <> True Then
-                        Dim distCC As Double                   'Stores the disturbed Canopy Cover
-                        Dim distCH As Double                    'Stores the disturbed Canopy Height
+                    ElseIf rs2.Fields!Lifeform.Value.ToString = "Tree" And rdoNoneDistGraph.Checked <> True Then
+                        Dim distCC As Double                  'Stores the disturbed Canopy Cover
+                        Dim distCH As Double                  'Stores the disturbed Canopy Height
 
                         cA = 1
-                        evhMidPoint = gf_GetHeightMid(evhCode, strProjectPath) * 10
+                        evhMidPoint = CInt(gf_GetHeightMid(evhCode, strProjectPath) * 10)
                         strSQL = "SELECT LUT_Cover.Lifeform, LUT_Cover.EVC " &
-                                    "FROM LUT_Cover " &
-                                    "WHERE(((LUT_Cover.Lifeform) = 'Tree')) " &
-                                    "ORDER BY LUT_Cover.EVC"
+                        "FROM LUT_Cover " &
+                        "WHERE(((LUT_Cover.Lifeform) = 'Tree')) " &
+                        "ORDER BY LUT_Cover.EVC"
                         rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
 
                         Do Until rs1.EOF
-                            'Get disturbed CC and CH if disturbed
-                            If gf_GetNum(cmbEVT.SelectedItem, "DIST") > 0 Then
-                                distCC = Canopy_LM_EQs((rs1.Fields!EVC.Value - 100) * 10 + 5,
-                                                            evhMidPoint / 10, gf_GetNum(cmbEVT.SelectedItem, "EVT"),
-                                                            gf_GetNum(cmbEVT.SelectedItem, "DIST"), "Cover")
-                                distCH = Canopy_LM_EQs((rs1.Fields!EVC.Value - 100) * 10 + 5,
-                                                            evhMidPoint / 10, gf_GetNum(cmbEVT.SelectedItem, "EVT"),
-                                                            gf_GetNum(cmbEVT.SelectedItem, "DIST"), "Height")
-                            Else                            'Get non disturbed CC and CH
-                                distCC = (rs1.Fields!EVC.Value - 100) * 10 + 5
-                                distCH = evhMidPoint / 10
-                            End If
+                            Application.DoEvents() 'Allow form to update while loop is running
+                            Try
+                                'Get disturbed CC and CH if disturbed
+                                If CInt(gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST")) > 0 Then
+                                    distCC = Canopy_LM_EQs(CShort((CInt(rs1.Fields!EVC.Value) - 100) * 10 + 5),
+                                                evhMidPoint / 10, CShort(gf_GetNum(cmbEVT.SelectedItem.ToString, "EVT")),
+                                                CShort(gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST")), "Cover")
+                                    distCH = Canopy_LM_EQs(CShort((CInt(rs1.Fields!EVC.Value) - 100) * 10 + 5),
+                                                           evhMidPoint / 10, CShort(gf_GetNum(cmbEVT.SelectedItem.ToString, "EVT")),
+                                                           CShort(gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST")), "Height")
+                                    If distCC < 10 Or distCH <= 1.8 Then
+                                        distCC = 0
+                                        distCH = 0
+                                    End If
+                                Else
+                                    'Get non disturbed CC and CH
+                                    distCC = (CDbl(rs1.Fields!EVC.Value) - 100) * 10 + 5
+                                    distCH = evhMidPoint / 10
+                                End If
 
-                            If distCC < 10 Or distCH <= 1.8 Then     'Check for 0 canopy
-                                seriesArray(cA) = 0
-                            ElseIf rdoCCDistGraph.Checked Then      'Get CCs
-                                seriesArray(cA) = distCC
-                            ElseIf rdoCHDistGraph.Checked Then      'Get CHs
-                                seriesArray(cA) = distCH
-                            ElseIf rdoCBHDistGraph.Checked Then     'Get CBHs
-                                seriesArray(cA) = Canopy_LM_EQs(distCC, distCH, gf_GetNum(cmbEVT.SelectedItem, "EVT"),
-                                                                gf_GetNum(cmbEVT.SelectedItem, "DIST"), "CBH")
-                            ElseIf rdoCBDDistGraph.Checked Then     'Get CBDs
-                                seriesArray(cA) = CalcCBDGLM(distCC, distCH) / 100
-                            Else                                    'Skip this record
-                                'Do Nothing
-                            End If
+                                If distCC < 10 Or distCH <= 1.8 Then     'Check for 0 canopy
+                                    seriesArray(cA) = 0
+                                ElseIf rdoCCDistGraph.Checked Then      'Get CCs
+                                    seriesArray(cA) = distCC
+                                ElseIf rdoCHDistGraph.Checked Then      'Get CHs
+                                    seriesArray(cA) = distCH
+                                ElseIf rdoCBHDistGraph.Checked Then     'Get CBHs
+                                    seriesArray(cA) = 0
+                                    seriesArray(cA) = Canopy_LM_EQs(distCC, distCH, CShort(gf_GetNum(cmbEVT.SelectedItem.ToString, "EVT")),
+                                                                    CShort(gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST")), "CBH")
+                                ElseIf rdoCBDDistGraph.Checked Then     'Get CBDs
+                                    seriesArray(cA) = 0
+                                    seriesArray(cA) = CalcCBDGLM(distCC, distCH) / 100
+                                Else                                    'Skip this record
+                                    'Do Nothing
+                                End If
 
-                            cA += 1
-                            rs1.MoveNext()
+                                cA += CShort(1)
+                                If rs1.EOF = False Then rs1.MoveNext()
+                                retryCount = 0 'Reset retry count for next record
+                            Catch ex As Exception
+                                If retryCount > 5000 Then
+                                    seriesArray(cA) = 0 'Set value to 0 if there is an error to avoid infinite loop
+                                    cA += CShort(1)
+                                    If rs1.EOF = False Then rs1.MoveNext()
+                                Else
+                                    Debug.Write("***********    " & retryCount)
+                                    retryCount += 1
+                                End If
+                                'Do nothing sometimes there is an unexpected error. Rerun the loop with the same values
+                            End Try
                         Loop
                         'Add a series to the chart with the x-values and y-values
                         'from the arrays and set the series type to a column chart
@@ -1440,7 +1466,7 @@ Public Class frmRule
                         oSeries = New Series
                         With oSeries
                             .YAxisType = AxisType.Secondary
-                            .Name = hgtArray(hA + treeCounter)
+                            .Name = hgtArray(hA + treeCounter).ToString
                             'Set Data
                             .Points.DataBindXY(covArray, seriesArray)
                             'Set marker
@@ -1455,20 +1481,20 @@ Public Class frmRule
 
                         'Add series to chart
                         chrtDist.Series.Add(oSeries)
-
-                        With chrtDist.Series(hgtArray(hA + treeCounter))
+                        With chrtDist.Series(CStr(hgtArray(hA + treeCounter)))
                             'Set series chart type
                             .ChartType = SeriesChartType.Line
                             '.ChartType = SeriesChartType.Candlestick
                             .Color = Color.FromArgb(rnd.Next(50, 200), rnd.Next(50, 200), rnd.Next(50, 200))   'Assign a color.
                         End With
-
                         Series1Index = chrtDist.Series.Count - 1                                        'Get starting count before adding CBH and CBD series
                         rs1.Close()
                     End If
                 End If
                 hA += 1
+
                 If rs2.EOF = False Then rs2.MoveNext()
+                'Debug.Print("hA = " & hA)
             Loop
             rs2.Close()
             chrtDist.Refresh()
@@ -1480,7 +1506,7 @@ Public Class frmRule
                     For Series2Index = Series1Index + 1 To chrtDist.Series.Count - 1                    'SeriesIndex to be compared to
                         For pIndex = 1 To 9                                                             'Points Index
                             If chrtDist.Series(Series1Index).Points(pIndex).ToString <>
-                                chrtDist.Series(Series2Index).Points(pIndex).ToString Then
+                            chrtDist.Series(Series2Index).Points(pIndex).ToString Then
                                 SeriesEqual = False
                             End If
                         Next
@@ -1511,13 +1537,13 @@ Public Class frmRule
 
             If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
             dbconn = Nothing
-            MsgBox("DistGraph() " & ex.Message)
+            MsgBox("Retry count " & retryCount & " " & ex.Message)
         End Try
     End Sub
 
-    Private Function Canopy_LM_EQs(ByVal numCC As Short, ByVal numCH As Integer, ByVal numEVT As Short,
+    Private Function Canopy_LM_EQs(ByVal numCC As Double, ByVal numCH As Double, ByVal numEVT As Short,
                                    ByVal numDist As Short, ByVal canopyType As String) As Double
-        Dim dbconn As New ADODB.Connection                                                  'DB connection
+        Dim dbconn As New ADODB.Connection                               'DB connection
         Dim rs1 As New ADODB.Recordset                                  'recordset for data
 
         dbconn.ConnectionString = gs_DBConnection &
@@ -1526,14 +1552,14 @@ Public Class frmRule
 
         Try
             'Get the equation for the specified coefficients
-            strSQL = "SELECT Tree_EVTs, HDist, intercept, HT_coef, CC_coef, EV_Structure " &
+            strSQL = "Select Tree_EVTs, HDist, intercept, HT_coef, CC_coef, EV_Structure " &
                      "FROM Master_Disturbance_Tbl " &
                      "WHERE (((Tree_EVTs)= " & numEVT & ") " &
-                     "AND ((HDist)= " & numDist & ") AND " &
+                     "And ((HDist)= " & numDist & ") And " &
                      "((EV_Structure)='" & canopyType & "'))"
             rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
 
-            Canopy_LM_EQs = rs1.Fields!intercept.Value + (rs1.Fields!HT_coef.Value * (numCH)) + (rs1.Fields!CC_coef.Value * numCC)
+            Canopy_LM_EQs = CDbl(rs1.Fields!intercept.Value) + (CDbl(rs1.Fields!HT_coef.Value) * (numCH)) + (CDbl(rs1.Fields!CC_coef.Value) * numCC)
 
             rs1.Close()
 
@@ -2128,7 +2154,7 @@ Public Class frmRule
         Dim dbconn As New ADODB.Connection                              'DB connection
         dbconn.ConnectionString = gs_DBConnection &
         strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open
+        dbconn.Open()
 
         Try
             Dim strNewFMNum As String 'Stores the newly entered fuel model number
@@ -2149,12 +2175,12 @@ Public Class frmRule
 
             Do While rs1.EOF = False
                 strNotAvail = strNotAvail & ", " & rs1.Fields!FMNum.Value
-                rs1.MoveNext
+                rs1.MoveNext()
             Loop
 
             Do While blnGood = False
                 'Get new Fuel Model Number from the user
-                rs1.MovePrevious
+                rs1.MovePrevious()
                 strNewFMNum = InputBox("Input a new 3 digit or less Custom Fuel Model number. " &
                          "Do not use Anderson 13 or Scott and Burgan existing Fuel Model Numbers. " &
                          "These numbers are already in use: " & strNotAvail, "New Custom FM Number",
@@ -2170,7 +2196,8 @@ Public Class frmRule
                     strError = "Error: " & strNewFMNum & " is either < 0 OR > 999."
                 End If
 
-                rs1.MoveFirst
+                rs1.MoveFirst()
+
                 Do While rs1.EOF = False And blnGood = True
 
                     If Int(strNewFMNum) = rs1.Fields!FMNum.Value Then
@@ -2178,9 +2205,9 @@ Public Class frmRule
                         strError = "Error: " & strNewFMNum & " =  an existing Fuel Model Number."
                     End If
 
-                    rs1.MoveNext
+                    rs1.MoveNext()
                 Loop
-                rs1.Close
+                rs1.Close()
 
                 'If blnGood is false let the user know why it is false
                 If blnGood = False Then MsgBox(strError, , "Bad Fuel Model Number")
@@ -2236,11 +2263,11 @@ Public Class frmRule
             cmdCustomFM.Text = "Custom" & vbCrLf & "FM"
             grpCustFM.Visible = False
 
-            cmbFM1.Items.Clear
-            cmbFM2.Items.Clear
-            cmbFM3.Items.Clear
-            cmbFM4.Items.Clear
-            cmbDefaultFM.Items.Clear
+            cmbFM1.Items.Clear()
+            cmbFM2.Items.Clear()
+            cmbFM3.Items.Clear()
+            cmbFM4.Items.Clear()
+            cmbDefaultFM.Items.Clear()
 
             'Populate Compare Fuel Model comboboxs
             cmbFM1.Items.Add("None")
@@ -2271,16 +2298,16 @@ Public Class frmRule
             cmbFM3.Text = "None"
             cmbFM4.Text = "None"
 
-            If rs1.State <> 0 Then rs1.Close
+            If rs1.State <> 0 Then rs1.Close()
             rs1 = Nothing
 
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close 'Database needs to be closed
+            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
             dbconn = Nothing
         Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close
+            If rs1.State <> 0 Then rs1.Close()
             rs1 = Nothing
 
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close 'Database needs to be closed
+            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
             dbconn = Nothing
             MsgBox("Error in cmdSaveCSTFM_Click - " & ex.Message)
         End Try
@@ -2290,7 +2317,7 @@ Public Class frmRule
         Dim dbconn As New ADODB.Connection                              'DB connection
         dbconn.ConnectionString = gs_DBConnection &
         strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open
+        dbconn.Open()
 
         Try
             Dim strErrAnderson = "Error: Anderson 13 fuel models cannot be deleted"
@@ -2319,11 +2346,11 @@ Public Class frmRule
                 Threading.Thread.Sleep(1000) 'Give the database a change to catchup
 
                 'Reset the comboxes
-                cmbFM1.Items.Clear
-                cmbFM2.Items.Clear
-                cmbFM3.Items.Clear
-                cmbFM4.Items.Clear
-                cmbDefaultFM.Items.Clear
+                cmbFM1.Items.Clear()
+                cmbFM2.Items.Clear()
+                cmbFM3.Items.Clear()
+                cmbFM4.Items.Clear()
+                cmbDefaultFM.Items.Clear()
 
                 'Populate Compare Fuel Model comboboxs
                 cmbFM1.Items.Add("None")
@@ -2366,106 +2393,6 @@ Public Class frmRule
             MsgBox("Error in cmdDelCstFM_Click - " & ex.Message)
         End Try
     End Sub
-
-    'Private Sub lstVwRulesets_MouseDoubleClick(ByVal sender As Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles lstVwRulesets.MouseDoubleClick
-    '    'The sql statements to pass to the Visual Rule Query
-    '    Dim strSQLEVT, strSQLRUle As String
-    '    'Boolean value for checking to see if a layer exists
-    '    Dim checkForaLayer As Boolean
-    '    'MU layer name
-    '    Dim strMULayerName As String
-    '    'Mouse point at the selected rule
-    '    Dim MousePt As Point
-    '    'Index of the selected rule
-    '    Dim SelectedRuleIndex As Integer
-    '    'EVT number only by EVT combination selection
-    '    Dim evtNum As Integer
-    '    'DIST number only by EVT combination selection
-    '    Dim distNum As Integer
-    '    'Get IMap
-    '    Dim pMap As ESRI.ArcGIS.Carto.IMap
-    '    'Get raster check layer
-    '    Dim pLayer As ESRI.ArcGIS.Carto.IRasterLayer
-    '    'Get EnumLayer to search through
-    '    Dim pEnumLayer As ESRI.ArcGIS.Carto.IEnumLayer
-
-    '    evtNum = gf_GetNum(cmbEVT.Text, "EVT")
-    '    distNum = gf_GetNum(cmbEVT.Text, "DIST")
-
-    '    MousePt = e.Location
-    '    strCMSItem = lstVwRulesets.Items.Item(lstVwRulesets.GetItemAt(MousePt.X, MousePt.Y).Index).GetSubItemAt(MousePt.X, MousePt.Y).Tag
-    '    lstVwRulesets.SelectedItems.Clear()
-    '    lstVwRulesets.Items.Item(lstVwRulesets.GetItemAt(MousePt.X, MousePt.Y).Index).Selected = True
-    '    SelectedRuleIndex = lstVwRulesets.SelectedItems(0).Index + 1
-
-    '    'Set the Rule
-    '    ruleE = RulesetCollection.Item(SelectedRuleIndex)
-    '    Try
-    '        strMULayerName = Strings.Left(comboR, Len(comboR) - 4)
-    '        'Check for MU in TOC
-    '        pMap = gs_pMxDoc.FocusMap
-
-    '        pEnumLayer = pMap.Layers
-    '        pLayer = pEnumLayer.Next
-
-    '        Do While Not pLayer Is Nothing
-    '            If UCase(pLayer.Name) = UCase(strMULayerName) Then
-    '                checkForaLayer = True
-    '                Exit Do
-    '            End If
-    '            pLayer = pEnumLayer.Next
-    '        Loop
-
-    '        If checkForaLayer = True Then
-    '            'Query for selected EVT and Rule
-    '            If IsNumeric(ruleE.BPS) Then 'Me.BPS is a number and does not equal "any"
-    '                strSQLRUle = "SELECT Value FROM " & comboR & " WHERE " &
-    '                    "(EVTR = " & evtNum & " And DIST = " & distNum & " And " &
-    '                    "EVCR Between " & ruleE.IntCovLow & " And " & ruleE.IntCovHigh & " And " &
-    '                    "EVHR Between " & ruleE.IntHgtLow & " And " & ruleE.IntHgtHigh & " And " &
-    '                    "BPSRF = " & ruleE.BPS & " And Wildcard = '" & ruleE.Wildcard & "')" &
-    '                    " Or " &
-    '                    "(EVTR = " & evtNum & " And DIST = " & distNum & " And " &
-    '                    "EVCR Between " & ruleE.IntCovLow & " And " & ruleE.IntCovHigh & " And " &
-    '                    "EVHR Between " & ruleE.IntHgtLow & " And " & ruleE.IntHgtHigh & " And " &
-    '                    "BPSRF = " & ruleE.BPS & " And '" & ruleE.Wildcard & "' = 'any')" &
-    '                    " ORDER BY Value"
-    '            Else 'Me. BPS is a string and equals "any"
-    '                strSQLRUle = "SELECT Value FROM " & comboR & " WHERE " &
-    '                    "(EVTR = " & evtNum & " And DIST = " & distNum & " And " &
-    '                    "EVCR Between " & ruleE.IntCovLow & " And " & ruleE.IntCovHigh & " And " &
-    '                    "EVHR Between " & ruleE.IntHgtLow & " And " & ruleE.IntHgtHigh & " And '" &
-    '                    ruleE.BPS & "' = 'any' And Wildcard = '" & ruleE.Wildcard & "')" &
-    '                    " Or " &
-    '                    "(EVTR = " & evtNum & " And DIST = " & distNum & " And " &
-    '                    "EVCR Between " & ruleE.IntCovLow & " And " & ruleE.IntCovHigh & " And " &
-    '                    "EVHR Between " & ruleE.IntHgtLow & " And " & ruleE.IntHgtHigh & " And '" &
-    '                    ruleE.BPS & "' = 'any' And '" & ruleE.Wildcard & "' = 'any')" &
-    '                    " ORDER BY Value"
-    '            End If
-
-    '            strSQLEVT = "SELECT EVTR, DIST " &
-    '                    "FROM " & comboR & " " &
-    '                    "GROUP BY EVTR, DIST " &
-    '                    "HAVING (EVTR = " & evtNum & " And DIST = " & distNum & ")"
-
-    '            'Run VisualRule
-    '            VisualRuleQuery(pLayer, strSQLEVT, strSQLRUle, strProjectPath)
-    '        Else
-    '            'layer is not in the TOC
-    '            MsgBox(" Add " & strMULayerName & " from project " & strProjectPath & vbCrLf &
-    '                   " MU folder to use double click Visual Rule Query.")
-    '        End If
-
-    '    Catch ex As System.Exception
-    '        'Do nothing
-    '        MsgBox("lstVwRulesets_MouseDoubleClick: " & ex.Message)
-    '    End Try
-
-    '    pLayer = Nothing
-    '    pEnumLayer = Nothing
-    '    pMap = Nothing
-    'End Sub
 
     Private Sub lstVwRulesets_MouseDown(ByVal sender As Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles lstVwRulesets.MouseDown
         Dim MousePt As Point

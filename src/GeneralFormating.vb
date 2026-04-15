@@ -28,29 +28,33 @@ Module GeneralFormating
         Dim record As Boolean = False
 
         gf_GetNum = ""
-        For Each i In value
-            If numType = "DIST" Then
-                If i = "[" Then
-                    record = True
-                ElseIf record = True And IsNumeric(i) Then
-                    gf_GetNum = gf_GetNum & i
-                ElseIf record = True And i = "]" Then
-                    Exit For
-                End If
-            ElseIf numType = "EVT" Then
-                If IsNumeric(i) Then
-                    gf_GetNum = gf_GetNum & i
-                ElseIf i = "[" Then
-                    Exit For
-                End If
-            Else
-                If IsNumeric(i) Then
-                    gf_GetNum = gf_GetNum & i
+        Try
+            For Each i In value
+                If numType = "DIST" Then
+                    If i = "[" Then
+                        record = True
+                    ElseIf record = True And IsNumeric(i) Then
+                        gf_GetNum = gf_GetNum & i
+                    ElseIf record = True And i = "]" Then
+                        Exit For
+                    End If
+                ElseIf numType = "EVT" Then
+                    If IsNumeric(i) Then
+                        gf_GetNum = gf_GetNum & i
+                    ElseIf i = "[" Then
+                        Exit For
+                    End If
                 Else
-                    Exit For
+                    If IsNumeric(i) Then
+                        gf_GetNum = gf_GetNum & i
+                    Else
+                        Exit For
+                    End If
                 End If
-            End If
-        Next
+            Next
+        Catch ex As Exception
+            Debug.Write("Error in gf_GetNum: " & ex.Message)
+        End Try
         If gf_GetNum = "" Then gf_GetNum = value 'If nothing is assigned to gf_GetNum then assign it the value
     End Function
 
@@ -154,7 +158,7 @@ Module GeneralFormating
         Dim strSQL As String
         'Populate the Wildcard box with the new Wildcard values for the selected EVT and BPS
         If IsNumeric(BPSNum) Then  'BPS value is a number not 'any'
-            strSQL = "SELECT WILDCARD " &
+            strSQL = "Select WILDCARD " &
                 "FROM " & ComboTable & " " &
                 "WHERE (EVTR = " & EVTNum &
                 " And DIST = " & DISTNum &
@@ -162,7 +166,7 @@ Module GeneralFormating
                 " Group By WILDCARD " &
                 " ORDER BY WILDCARD"
         Else 'BPS value is a text it is an 'any' value
-            strSQL = "SELECT WILDCARD " &
+            strSQL = "Select WILDCARD " &
                 "FROM " & ComboTable & " " &
                 "WHERE (EVTR = " & EVTNum &
                 " And DIST = " & DISTNum & ")" &

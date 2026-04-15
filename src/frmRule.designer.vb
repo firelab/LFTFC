@@ -182,10 +182,10 @@ Partial Class frmRule
         DistributionGraph.Controls.Add(lblWildcard)
         DistributionGraph.Controls.Add(cmbBPSGraph)
         DistributionGraph.Controls.Add(lblBPS)
-        DistributionGraph.Location = New System.Drawing.Point(4, 24)
+        DistributionGraph.Location = New System.Drawing.Point(4, 37)
         DistributionGraph.Name = "DistributionGraph"
         DistributionGraph.Padding = New Padding(3)
-        DistributionGraph.Size = New System.Drawing.Size(825, 438)
+        DistributionGraph.Size = New System.Drawing.Size(825, 449)
         DistributionGraph.TabIndex = 1
         DistributionGraph.Text = "Distribution Graph"
         DistributionGraph.UseVisualStyleBackColor = True
@@ -211,7 +211,7 @@ Partial Class frmRule
         rdoCHDistGraph.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoCHDistGraph.Location = New System.Drawing.Point(224, 15)
         rdoCHDistGraph.Name = "rdoCHDistGraph"
-        rdoCHDistGraph.Size = New System.Drawing.Size(104, 21)
+        rdoCHDistGraph.Size = New System.Drawing.Size(130, 24)
         rdoCHDistGraph.TabIndex = 5
         rdoCHDistGraph.Text = "Canopy Height"
         rdoCHDistGraph.UseVisualStyleBackColor = True
@@ -222,7 +222,7 @@ Partial Class frmRule
         rdoCCDistGraph.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoCCDistGraph.Location = New System.Drawing.Point(95, 15)
         rdoCCDistGraph.Name = "rdoCCDistGraph"
-        rdoCCDistGraph.Size = New System.Drawing.Size(98, 21)
+        rdoCCDistGraph.Size = New System.Drawing.Size(122, 24)
         rdoCCDistGraph.TabIndex = 4
         rdoCCDistGraph.Text = "Canopy Cover"
         rdoCCDistGraph.UseVisualStyleBackColor = True
@@ -233,7 +233,7 @@ Partial Class frmRule
         rdoCBDDistGraph.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoCBDDistGraph.Location = New System.Drawing.Point(524, 15)
         rdoCBDDistGraph.Name = "rdoCBDDistGraph"
-        rdoCBDDistGraph.Size = New System.Drawing.Size(138, 21)
+        rdoCBDDistGraph.Size = New System.Drawing.Size(170, 24)
         rdoCBDDistGraph.TabIndex = 3
         rdoCBDDistGraph.Text = "Canopy Bulk Density"
         rdoCBDDistGraph.UseVisualStyleBackColor = True
@@ -244,7 +244,7 @@ Partial Class frmRule
         rdoCBHDistGraph.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoCBHDistGraph.Location = New System.Drawing.Point(359, 15)
         rdoCBHDistGraph.Name = "rdoCBHDistGraph"
-        rdoCBHDistGraph.Size = New System.Drawing.Size(134, 21)
+        rdoCBHDistGraph.Size = New System.Drawing.Size(166, 24)
         rdoCBHDistGraph.TabIndex = 2
         rdoCBHDistGraph.Text = "Canopy Base Height"
         rdoCBHDistGraph.UseVisualStyleBackColor = True
@@ -256,7 +256,7 @@ Partial Class frmRule
         rdoNoneDistGraph.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoNoneDistGraph.Location = New System.Drawing.Point(10, 15)
         rdoNoneDistGraph.Name = "rdoNoneDistGraph"
-        rdoNoneDistGraph.Size = New System.Drawing.Size(54, 21)
+        rdoNoneDistGraph.Size = New System.Drawing.Size(66, 24)
         rdoNoneDistGraph.TabIndex = 1
         rdoNoneDistGraph.TabStop = True
         rdoNoneDistGraph.Text = "None"
@@ -268,7 +268,7 @@ Partial Class frmRule
         cmbWildGraph.Location = New System.Drawing.Point(0, 79)
         cmbWildGraph.Margin = New Padding(5)
         cmbWildGraph.Name = "cmbWildGraph"
-        cmbWildGraph.Size = New System.Drawing.Size(673, 31)
+        cmbWildGraph.Size = New System.Drawing.Size(673, 36)
         cmbWildGraph.TabIndex = 13
         ' 
         ' lblWildcard
@@ -291,7 +291,7 @@ Partial Class frmRule
         cmbBPSGraph.Location = New System.Drawing.Point(0, 22)
         cmbBPSGraph.Margin = New Padding(5)
         cmbBPSGraph.Name = "cmbBPSGraph"
-        cmbBPSGraph.Size = New System.Drawing.Size(673, 31)
+        cmbBPSGraph.Size = New System.Drawing.Size(673, 36)
         cmbBPSGraph.TabIndex = 11
         ' 
         ' lblBPS
@@ -311,10 +311,10 @@ Partial Class frmRule
         ' EVTDescription
         ' 
         EVTDescription.Controls.Add(txtEVTDescription)
-        EVTDescription.Location = New System.Drawing.Point(4, 24)
+        EVTDescription.Location = New System.Drawing.Point(4, 29)
         EVTDescription.Name = "EVTDescription"
         EVTDescription.Padding = New Padding(3)
-        EVTDescription.Size = New System.Drawing.Size(825, 438)
+        EVTDescription.Size = New System.Drawing.Size(825, 433)
         EVTDescription.TabIndex = 2
         EVTDescription.Text = "EVT Description"
         EVTDescription.UseVisualStyleBackColor = True
@@ -344,7 +344,7 @@ Partial Class frmRule
         TabControl.Location = New System.Drawing.Point(108, 87)
         TabControl.Name = "TabControl"
         TabControl.SelectedIndex = 0
-        TabControl.Size = New System.Drawing.Size(833, 466)
+        TabControl.Size = New System.Drawing.Size(833, 490)
         TabControl.TabIndex = 23
         ' 
         ' Ruleset
@@ -353,10 +353,10 @@ Partial Class frmRule
         Ruleset.Controls.Add(txtNotes)
         Ruleset.Controls.Add(lstVwRulesets)
         Ruleset.Font = New System.Drawing.Font("Comic Sans MS", 9.75F)
-        Ruleset.Location = New System.Drawing.Point(4, 32)
+        Ruleset.Location = New System.Drawing.Point(4, 37)
         Ruleset.Name = "Ruleset"
         Ruleset.Padding = New Padding(3)
-        Ruleset.Size = New System.Drawing.Size(825, 430)
+        Ruleset.Size = New System.Drawing.Size(825, 449)
         Ruleset.TabIndex = 0
         Ruleset.Text = "Ruleset"
         Ruleset.UseVisualStyleBackColor = True
@@ -367,7 +367,7 @@ Partial Class frmRule
         lblPixelsLeftOver.BorderStyle = BorderStyle.Fixed3D
         lblPixelsLeftOver.FlatStyle = FlatStyle.Popup
         lblPixelsLeftOver.Font = New System.Drawing.Font("Comic Sans MS", 9.75F)
-        lblPixelsLeftOver.Location = New System.Drawing.Point(5, 2)
+        lblPixelsLeftOver.Location = New System.Drawing.Point(4, 2)
         lblPixelsLeftOver.Margin = New Padding(5, 0, 5, 0)
         lblPixelsLeftOver.Name = "lblPixelsLeftOver"
         lblPixelsLeftOver.Size = New System.Drawing.Size(897, 20)
@@ -377,7 +377,7 @@ Partial Class frmRule
         ' 
         ' txtNotes
         ' 
-        txtNotes.Location = New System.Drawing.Point(5, 272)
+        txtNotes.Location = New System.Drawing.Point(4, 272)
         txtNotes.Multiline = True
         txtNotes.Name = "txtNotes"
         txtNotes.ScrollBars = ScrollBars.Vertical
@@ -390,7 +390,7 @@ Partial Class frmRule
         lstVwRulesets.Columns.AddRange(New ColumnHeader() {ID, RangeofCover, RangeofHeight, BPS, Wild, FM13, FM40, CanFM, FCCS, FLM, CG, CC, CH, CBD13, CBD40, CBH13, CBH40, OnOff, Acres, PerEVT})
         lstVwRulesets.FullRowSelect = True
         lstVwRulesets.GridLines = True
-        lstVwRulesets.Location = New System.Drawing.Point(5, 23)
+        lstVwRulesets.Location = New System.Drawing.Point(4, 23)
         lstVwRulesets.Name = "lstVwRulesets"
         lstVwRulesets.Size = New System.Drawing.Size(905, 243)
         lstVwRulesets.TabIndex = 38
@@ -494,9 +494,9 @@ Partial Class frmRule
         CompareFM.Controls.Add(cmbFM2)
         CompareFM.Controls.Add(cmbFM1)
         CompareFM.Controls.Add(lblFuelModel)
-        CompareFM.Location = New System.Drawing.Point(4, 24)
+        CompareFM.Location = New System.Drawing.Point(4, 29)
         CompareFM.Name = "CompareFM"
-        CompareFM.Size = New System.Drawing.Size(825, 438)
+        CompareFM.Size = New System.Drawing.Size(825, 433)
         CompareFM.TabIndex = 1
         CompareFM.Text = "Compare FM"
         ' 
@@ -535,7 +535,7 @@ Partial Class frmRule
         rdoLM4.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoLM4.Location = New System.Drawing.Point(4, 75)
         rdoLM4.Name = "rdoLM4"
-        rdoLM4.Size = New System.Drawing.Size(125, 21)
+        rdoLM4.Size = New System.Drawing.Size(156, 24)
         rdoLM4.TabIndex = 3
         rdoLM4.Text = "120 Hrb; 150 Wdy"
         rdoLM4.UseVisualStyleBackColor = True
@@ -546,7 +546,7 @@ Partial Class frmRule
         rdoLM3.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoLM3.Location = New System.Drawing.Point(4, 54)
         rdoLM3.Name = "rdoLM3"
-        rdoLM3.Size = New System.Drawing.Size(120, 21)
+        rdoLM3.Size = New System.Drawing.Size(149, 24)
         rdoLM3.TabIndex = 2
         rdoLM3.Text = "90 Hrb; 120 Wdy"
         rdoLM3.UseVisualStyleBackColor = True
@@ -557,7 +557,7 @@ Partial Class frmRule
         rdoLM2.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoLM2.Location = New System.Drawing.Point(4, 33)
         rdoLM2.Name = "rdoLM2"
-        rdoLM2.Size = New System.Drawing.Size(115, 21)
+        rdoLM2.Size = New System.Drawing.Size(142, 24)
         rdoLM2.TabIndex = 1
         rdoLM2.Text = "60 Hrb; 90 Wdy"
         rdoLM2.UseVisualStyleBackColor = True
@@ -569,7 +569,7 @@ Partial Class frmRule
         rdoLM1.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoLM1.Location = New System.Drawing.Point(4, 12)
         rdoLM1.Name = "rdoLM1"
-        rdoLM1.Size = New System.Drawing.Size(115, 21)
+        rdoLM1.Size = New System.Drawing.Size(142, 24)
         rdoLM1.TabIndex = 0
         rdoLM1.TabStop = True
         rdoLM1.Text = "30 Hrb; 60 Wdy"
@@ -595,7 +595,7 @@ Partial Class frmRule
         rdoDM4.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoDM4.Location = New System.Drawing.Point(6, 75)
         rdoDM4.Name = "rdoDM4"
-        rdoDM4.Size = New System.Drawing.Size(68, 21)
+        rdoDM4.Size = New System.Drawing.Size(86, 24)
         rdoDM4.TabIndex = 3
         rdoDM4.Text = "12,13,14"
         rdoDM4.UseVisualStyleBackColor = True
@@ -606,7 +606,7 @@ Partial Class frmRule
         rdoDM3.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoDM3.Location = New System.Drawing.Point(6, 54)
         rdoDM3.Name = "rdoDM3"
-        rdoDM3.Size = New System.Drawing.Size(61, 21)
+        rdoDM3.Size = New System.Drawing.Size(77, 24)
         rdoDM3.TabIndex = 2
         rdoDM3.Text = "9,10,11"
         rdoDM3.UseVisualStyleBackColor = True
@@ -617,7 +617,7 @@ Partial Class frmRule
         rdoDM2.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoDM2.Location = New System.Drawing.Point(6, 33)
         rdoDM2.Name = "rdoDM2"
-        rdoDM2.Size = New System.Drawing.Size(53, 21)
+        rdoDM2.Size = New System.Drawing.Size(65, 24)
         rdoDM2.TabIndex = 1
         rdoDM2.Text = "6,7,8"
         rdoDM2.UseVisualStyleBackColor = True
@@ -629,7 +629,7 @@ Partial Class frmRule
         rdoDM1.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoDM1.Location = New System.Drawing.Point(6, 12)
         rdoDM1.Name = "rdoDM1"
-        rdoDM1.Size = New System.Drawing.Size(53, 21)
+        rdoDM1.Size = New System.Drawing.Size(65, 24)
         rdoDM1.TabIndex = 0
         rdoDM1.TabStop = True
         rdoDM1.Text = "3,4,5"
@@ -654,7 +654,7 @@ Partial Class frmRule
         rdoCBH.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoCBH.Location = New System.Drawing.Point(5, 70)
         rdoCBH.Name = "rdoCBH"
-        rdoCBH.Size = New System.Drawing.Size(94, 21)
+        rdoCBH.Size = New System.Drawing.Size(115, 24)
         rdoCBH.TabIndex = 2
         rdoCBH.Text = "FL+ CBH(ft)"
         rdoCBH.UseVisualStyleBackColor = True
@@ -665,7 +665,7 @@ Partial Class frmRule
         rdoFL.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoFL.Location = New System.Drawing.Point(6, 43)
         rdoFL.Name = "rdoFL"
-        rdoFL.Size = New System.Drawing.Size(60, 21)
+        rdoFL.Size = New System.Drawing.Size(74, 24)
         rdoFL.TabIndex = 1
         rdoFL.Text = "FL(ft)"
         rdoFL.UseVisualStyleBackColor = True
@@ -677,7 +677,7 @@ Partial Class frmRule
         rdoROS.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoROS.Location = New System.Drawing.Point(5, 16)
         rdoROS.Name = "rdoROS"
-        rdoROS.Size = New System.Drawing.Size(89, 21)
+        rdoROS.Size = New System.Drawing.Size(112, 24)
         rdoROS.TabIndex = 0
         rdoROS.TabStop = True
         rdoROS.Text = "ROS(ch/hr)"
@@ -690,7 +690,7 @@ Partial Class frmRule
         cmbSlope.FormattingEnabled = True
         cmbSlope.Location = New System.Drawing.Point(363, 26)
         cmbSlope.Name = "cmbSlope"
-        cmbSlope.Size = New System.Drawing.Size(59, 26)
+        cmbSlope.Size = New System.Drawing.Size(59, 31)
         cmbSlope.TabIndex = 75
         ' 
         ' lblSlope
@@ -714,7 +714,7 @@ Partial Class frmRule
         cmbFM4.FormattingEnabled = True
         cmbFM4.Location = New System.Drawing.Point(612, 25)
         cmbFM4.Name = "cmbFM4"
-        cmbFM4.Size = New System.Drawing.Size(60, 26)
+        cmbFM4.Size = New System.Drawing.Size(60, 31)
         cmbFM4.TabIndex = 72
         ' 
         ' cmbFM3
@@ -724,7 +724,7 @@ Partial Class frmRule
         cmbFM3.FormattingEnabled = True
         cmbFM3.Location = New System.Drawing.Point(551, 25)
         cmbFM3.Name = "cmbFM3"
-        cmbFM3.Size = New System.Drawing.Size(60, 26)
+        cmbFM3.Size = New System.Drawing.Size(60, 31)
         cmbFM3.TabIndex = 71
         ' 
         ' cmbFM2
@@ -734,7 +734,7 @@ Partial Class frmRule
         cmbFM2.FormattingEnabled = True
         cmbFM2.Location = New System.Drawing.Point(490, 25)
         cmbFM2.Name = "cmbFM2"
-        cmbFM2.Size = New System.Drawing.Size(60, 26)
+        cmbFM2.Size = New System.Drawing.Size(60, 31)
         cmbFM2.TabIndex = 70
         ' 
         ' cmbFM1
@@ -744,7 +744,7 @@ Partial Class frmRule
         cmbFM1.FormattingEnabled = True
         cmbFM1.Location = New System.Drawing.Point(429, 25)
         cmbFM1.Name = "cmbFM1"
-        cmbFM1.Size = New System.Drawing.Size(60, 26)
+        cmbFM1.Size = New System.Drawing.Size(60, 31)
         cmbFM1.TabIndex = 69
         ' 
         ' lblFuelModel
@@ -792,7 +792,7 @@ Partial Class frmRule
         grpCustFM.Controls.Add(rdo10H)
         grpCustFM.Controls.Add(rdo1H)
         grpCustFM.Font = New System.Drawing.Font("Comic Sans MS", 8.25F)
-        grpCustFM.Location = New System.Drawing.Point(0, 2)
+        grpCustFM.Location = New System.Drawing.Point(112, 55)
         grpCustFM.Name = "grpCustFM"
         grpCustFM.Size = New System.Drawing.Size(797, 111)
         grpCustFM.TabIndex = 121
@@ -835,7 +835,7 @@ Partial Class frmRule
         chkFMType.Font = New System.Drawing.Font("Comic Sans MS", 9.75F)
         chkFMType.Location = New System.Drawing.Point(339, 38)
         chkFMType.Name = "chkFMType"
-        chkFMType.Size = New System.Drawing.Size(77, 22)
+        chkFMType.Size = New System.Drawing.Size(97, 28)
         chkFMType.TabIndex = 84
         chkFMType.Text = "Dynamic"
         chkFMType.UseVisualStyleBackColor = True
@@ -1015,7 +1015,7 @@ Partial Class frmRule
         cmbDefaultFM.FormattingEnabled = True
         cmbDefaultFM.Location = New System.Drawing.Point(440, 75)
         cmbDefaultFM.Name = "cmbDefaultFM"
-        cmbDefaultFM.Size = New System.Drawing.Size(97, 26)
+        cmbDefaultFM.Size = New System.Drawing.Size(97, 31)
         cmbDefaultFM.TabIndex = 70
         ' 
         ' TrkBar
@@ -1025,7 +1025,7 @@ Partial Class frmRule
         TrkBar.Location = New System.Drawing.Point(4, 65)
         TrkBar.Margin = New Padding(0)
         TrkBar.Name = "TrkBar"
-        TrkBar.Size = New System.Drawing.Size(332, 45)
+        TrkBar.Size = New System.Drawing.Size(332, 56)
         TrkBar.TabIndex = 24
         TrkBar.TickStyle = TickStyle.Both
         ' 
@@ -1035,7 +1035,7 @@ Partial Class frmRule
         rdoXtMoist.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoXtMoist.Location = New System.Drawing.Point(687, 39)
         rdoXtMoist.Name = "rdoXtMoist"
-        rdoXtMoist.Size = New System.Drawing.Size(61, 21)
+        rdoXtMoist.Size = New System.Drawing.Size(75, 24)
         rdoXtMoist.TabIndex = 23
         rdoXtMoist.Text = "00000"
         rdoXtMoist.UseVisualStyleBackColor = True
@@ -1046,7 +1046,7 @@ Partial Class frmRule
         rdoLiveW.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoLiveW.Location = New System.Drawing.Point(272, 39)
         rdoLiveW.Name = "rdoLiveW"
-        rdoLiveW.Size = New System.Drawing.Size(61, 21)
+        rdoLiveW.Size = New System.Drawing.Size(75, 24)
         rdoLiveW.TabIndex = 9
         rdoLiveW.Text = "00000"
         rdoLiveW.UseVisualStyleBackColor = True
@@ -1057,7 +1057,7 @@ Partial Class frmRule
         rdo1HSAV.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdo1HSAV.Location = New System.Drawing.Point(419, 39)
         rdo1HSAV.Name = "rdo1HSAV"
-        rdo1HSAV.Size = New System.Drawing.Size(61, 21)
+        rdo1HSAV.Size = New System.Drawing.Size(75, 24)
         rdo1HSAV.TabIndex = 7
         rdo1HSAV.Text = "00000"
         rdo1HSAV.UseVisualStyleBackColor = True
@@ -1068,7 +1068,7 @@ Partial Class frmRule
         rdoLiveHSAV.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoLiveHSAV.Location = New System.Drawing.Point(486, 39)
         rdoLiveHSAV.Name = "rdoLiveHSAV"
-        rdoLiveHSAV.Size = New System.Drawing.Size(61, 21)
+        rdoLiveHSAV.Size = New System.Drawing.Size(75, 24)
         rdoLiveHSAV.TabIndex = 6
         rdoLiveHSAV.Text = "00000"
         rdoLiveHSAV.UseVisualStyleBackColor = True
@@ -1079,7 +1079,7 @@ Partial Class frmRule
         rdoLiveWSAV.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoLiveWSAV.Location = New System.Drawing.Point(553, 39)
         rdoLiveWSAV.Name = "rdoLiveWSAV"
-        rdoLiveWSAV.Size = New System.Drawing.Size(61, 21)
+        rdoLiveWSAV.Size = New System.Drawing.Size(75, 24)
         rdoLiveWSAV.TabIndex = 5
         rdoLiveWSAV.Text = "00000"
         rdoLiveWSAV.UseVisualStyleBackColor = True
@@ -1090,7 +1090,7 @@ Partial Class frmRule
         rdoDepth.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoDepth.Location = New System.Drawing.Point(620, 39)
         rdoDepth.Name = "rdoDepth"
-        rdoDepth.Size = New System.Drawing.Size(61, 21)
+        rdoDepth.Size = New System.Drawing.Size(75, 24)
         rdoDepth.TabIndex = 4
         rdoDepth.Text = "00000"
         rdoDepth.UseVisualStyleBackColor = True
@@ -1101,7 +1101,7 @@ Partial Class frmRule
         rdoLiveH.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoLiveH.Location = New System.Drawing.Point(205, 39)
         rdoLiveH.Name = "rdoLiveH"
-        rdoLiveH.Size = New System.Drawing.Size(61, 21)
+        rdoLiveH.Size = New System.Drawing.Size(75, 24)
         rdoLiveH.TabIndex = 3
         rdoLiveH.Text = "00000"
         rdoLiveH.UseVisualStyleBackColor = True
@@ -1112,7 +1112,7 @@ Partial Class frmRule
         rdo100H.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdo100H.Location = New System.Drawing.Point(138, 39)
         rdo100H.Name = "rdo100H"
-        rdo100H.Size = New System.Drawing.Size(61, 21)
+        rdo100H.Size = New System.Drawing.Size(75, 24)
         rdo100H.TabIndex = 2
         rdo100H.Text = "00000"
         rdo100H.UseVisualStyleBackColor = True
@@ -1123,7 +1123,7 @@ Partial Class frmRule
         rdo10H.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdo10H.Location = New System.Drawing.Point(71, 39)
         rdo10H.Name = "rdo10H"
-        rdo10H.Size = New System.Drawing.Size(61, 21)
+        rdo10H.Size = New System.Drawing.Size(75, 24)
         rdo10H.TabIndex = 1
         rdo10H.Text = "00000"
         rdo10H.UseVisualStyleBackColor = True
@@ -1135,7 +1135,7 @@ Partial Class frmRule
         rdo1H.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdo1H.Location = New System.Drawing.Point(4, 39)
         rdo1H.Name = "rdo1H"
-        rdo1H.Size = New System.Drawing.Size(61, 21)
+        rdo1H.Size = New System.Drawing.Size(75, 24)
         rdo1H.TabIndex = 0
         rdo1H.TabStop = True
         rdo1H.Text = "00000"
@@ -1151,7 +1151,7 @@ Partial Class frmRule
         cmbEVT.Location = New System.Drawing.Point(0, 49)
         cmbEVT.Margin = New Padding(5)
         cmbEVT.Name = "cmbEVT"
-        cmbEVT.Size = New System.Drawing.Size(941, 31)
+        cmbEVT.Size = New System.Drawing.Size(941, 36)
         cmbEVT.TabIndex = 22
         ' 
         ' txtSessionName
@@ -1159,7 +1159,7 @@ Partial Class frmRule
         txtSessionName.BackColor = Drawing.Color.White
         txtSessionName.Location = New System.Drawing.Point(296, 14)
         txtSessionName.Name = "txtSessionName"
-        txtSessionName.Size = New System.Drawing.Size(180, 30)
+        txtSessionName.Size = New System.Drawing.Size(180, 35)
         txtSessionName.TabIndex = 20
         txtSessionName.Text = "New Session Name"
         ' 
@@ -1168,6 +1168,7 @@ Partial Class frmRule
         cmsEditRule.AccessibleRole = AccessibleRole.ComboBox
         cmsEditRule.BackColor = Drawing.Color.FromArgb(CByte(192), CByte(255), CByte(192))
         cmsEditRule.Font = New System.Drawing.Font("Comic Sans MS", 9.75F, Drawing.FontStyle.Bold)
+        cmsEditRule.ImageScalingSize = New System.Drawing.Size(20, 20)
         cmsEditRule.LayoutStyle = ToolStripLayoutStyle.VerticalStackWithOverflow
         cmsEditRule.MaximumSize = New System.Drawing.Size(0, 550)
         cmsEditRule.Name = "cmsEditRule"
@@ -1179,6 +1180,7 @@ Partial Class frmRule
         cmsLowHigh.AccessibleRole = AccessibleRole.ComboBox
         cmsLowHigh.BackColor = Drawing.Color.FromArgb(CByte(192), CByte(255), CByte(192))
         cmsLowHigh.Font = New System.Drawing.Font("Comic Sans MS", 9.75F, Drawing.FontStyle.Bold)
+        cmsLowHigh.ImageScalingSize = New System.Drawing.Size(20, 20)
         cmsLowHigh.LayoutStyle = ToolStripLayoutStyle.VerticalStackWithOverflow
         cmsLowHigh.Name = "cmsLowHigh"
         cmsLowHigh.ShowImageMargin = False
@@ -1191,7 +1193,7 @@ Partial Class frmRule
         cmbSortRules.FormattingEnabled = True
         cmbSortRules.Location = New System.Drawing.Point(4, 15)
         cmbSortRules.Name = "cmbSortRules"
-        cmbSortRules.Size = New System.Drawing.Size(136, 26)
+        cmbSortRules.Size = New System.Drawing.Size(136, 31)
         cmbSortRules.TabIndex = 71
         ' 
         ' grpEVTOrder
@@ -1212,7 +1214,7 @@ Partial Class frmRule
         rdoNumber.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoNumber.Location = New System.Drawing.Point(65, 14)
         rdoNumber.Name = "rdoNumber"
-        rdoNumber.Size = New System.Drawing.Size(68, 21)
+        rdoNumber.Size = New System.Drawing.Size(85, 24)
         rdoNumber.TabIndex = 2
         rdoNumber.Text = "Number"
         rdoNumber.UseVisualStyleBackColor = True
@@ -1224,7 +1226,7 @@ Partial Class frmRule
         rdoName.Font = New System.Drawing.Font("Comic Sans MS", 9F)
         rdoName.Location = New System.Drawing.Point(4, 14)
         rdoName.Name = "rdoName"
-        rdoName.Size = New System.Drawing.Size(56, 21)
+        rdoName.Size = New System.Drawing.Size(69, 24)
         rdoName.TabIndex = 0
         rdoName.TabStop = True
         rdoName.Text = "Name"
@@ -1327,10 +1329,10 @@ Partial Class frmRule
         ' 
         ' frmRule
         ' 
-        AutoScaleDimensions = New System.Drawing.SizeF(10F, 23F)
+        AutoScaleDimensions = New System.Drawing.SizeF(12F, 28F)
         AutoScaleMode = AutoScaleMode.Font
         AutoSizeMode = AutoSizeMode.GrowAndShrink
-        ClientSize = New System.Drawing.Size(944, 555)
+        ClientSize = New System.Drawing.Size(944, 578)
         Controls.Add(grpCustFM)
         Controls.Add(lblDistCode)
         Controls.Add(cmdAutoRule)
