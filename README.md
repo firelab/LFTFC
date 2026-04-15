@@ -12,7 +12,6 @@ See the full release history and detailed updates in [UPDATES.md](UPDATES.md).
 See the [LICENSE](LICENSE) file for licensing information.
 
 ## Directories:
-- libs -> dynamic link librarys (DDLs)
 - images -> images for icons
 - src -> source files
 
