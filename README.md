@@ -42,7 +42,7 @@ To build the add-in, follow these steps:
 3. In the solution, ensure the ArcGIS Pro SDK packages and references resolve. Install the ArcGIS Pro SDK if missing.
 4. Add manifest file. (Right-click "My Project" folder > Add > New Item > Select "Application Manifest File" > Click "Add" Button. 
 5. Build the add-in by Right-clicking Solution > Build Solution.
-6. To Run ArcGISPro in Debug.
+6. Optional Set ArcGISPro to run in debugger.
    > A) Select the dropdown > LFTFC_Pro Debug Properties <img width="257" height="156" alt="image" src="https://github.com/user-attachments/assets/7b859952-e729-46ea-ba6e-d1cbb6169f40" />
    > > B) Create a new profile <img width="166" height="99" alt="image" src="https://github.com/user-attachments/assets/4e2380ad-339c-4a4b-93a2-04b2daaf022f" />
    > > > C) Executable <img width="144" height="115" alt="image" src="https://github.com/user-attachments/assets/7c232d6b-d794-410e-9bed-b4ce318ec458" />
