@@ -34,8 +34,7 @@ Before you begin, ensure you have the following software installed:
 To build the add-in, follow these steps:
 
 1. Clone the repository. <img width="374" height="127" alt="image" src="https://github.com/user-attachments/assets/1f8c28f6-3b86-44df-ba4c-272bdf3cbdd3" />
-   > Set Repository location to: https://github.com/firelab/LFTFC
-   > Set Path to a new folder location <img width="633" height="255" alt="image" src="https://github.com/user-attachments/assets/85ef9f78-d02f-462a-a6ec-a5c2df831af8" />
+   > Set Repository location to: https://github.com/firelab/LFTFC and Set Path to a new folder location <img width="633" height="255" alt="image" src="https://github.com/user-attachments/assets/85ef9f78-d02f-462a-a6ec-a5c2df831af8" />
 2. Click "Clone" <img width="266" height="108" alt="image" src="https://github.com/user-attachments/assets/fe1e4582-187d-401b-855d-d037d47e72af" />
 3. Open the Visual Studio solution in Visual Studio 2022.
 4. In the solution, ensure the ArcGIS Pro SDK packages and references resolve. Install the ArcGIS Pro SDK if missing.
