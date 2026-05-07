@@ -35,7 +35,7 @@ To build the add-in, follow these steps:
 
 1. Clone the repository.
    > A) Start a new instance of Visual Studio 2022
-   > B) Click "Clone a repository" <img width="374" height="127" alt="image" src="https://github.com/user-attachments/assets/1f8c28f6-3b86-44df-ba4c-272bdf3cbdd3" />
+   > > B) Click "Clone a repository" <img width="374" height="127" alt="image" src="https://github.com/user-attachments/assets/1f8c28f6-3b86-44df-ba4c-272bdf3cbdd3" />
    C) Set Repository location to: https://github.com/firelab/LFTFC and Set Path to a new folder location <img width="633" height="255" alt="image" src="https://github.com/user-attachments/assets/85ef9f78-d02f-462a-a6ec-a5c2df831af8" />
    D) Click "Clone" <img width="266" height="108" alt="image" src="https://github.com/user-attachments/assets/fe1e4582-187d-401b-855d-d037d47e72af" />
 2. Open the Visual Studio solution in Visual Studio 2022.
