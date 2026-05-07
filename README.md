@@ -39,7 +39,14 @@ To build the add-in, follow these steps:
 4. Set the project Platform target to x64 when projects interact with the Access database (open __Project > Properties > Build__ and set __Platform target__ to __x64__).
 5. Add manifest file. (Right-click "My Project" folder > Add > New Item > Select "Application Manifest File" > Click "Add" Button. 
 6. Build the add-in by Right-clicking Solution > Build Solution.
-7. To Run ArcGISPro in Debug. Select the dropdown <img width="257" height="156" alt="image" src="https://github.com/user-attachments/assets/7b859952-e729-46ea-ba6e-d1cbb6169f40" /> > LFTFC_Pro Debug Properties > Create a new profile <img width="166" height="99" alt="image" src="https://github.com/user-attachments/assets/4e2380ad-339c-4a4b-93a2-04b2daaf022f" /> > Executable > Rename the new profile if you want. <img width="243" height="175" alt="image" src="https://github.com/user-attachments/assets/6dc01173-2efb-4c50-984c-0166cbd6a274" /> > Browse to set ArcGISPro.exe as the executable and close <img width="419" height="89" alt="image" src="https://github.com/user-attachments/assets/49934dfd-343e-4c56-9ec3-2f7d4cc5da5e" /> > Select the new profile <img width="246" height="161" alt="image" src="https://github.com/user-attachments/assets/d2ef461f-b66f-4661-8b0c-01c0dab10821" />
+7. To Run ArcGISPro in Debug.
+   > Select the dropdown <img width="257" height="156" alt="image" src="https://github.com/user-attachments/assets/7b859952-e729-46ea-ba6e-d1cbb6169f40" />
+   > LFTFC_Pro Debug Properties > Create a new profile <img width="166" height="99" alt="image" src="https://github.com/user-attachments/assets/4e2380ad-339c-4a4b-93a2-04b2daaf022f" />
+   > Executable
+   > Rename the new profile if you want. <img width="243" height="175" alt="image" src="https://github.com/user-attachments/assets/6dc01173-2efb-4c50-984c-0166cbd6a274" />
+   > Browse to set ArcGISPro.exe as the executable and close <img width="419" height="89" alt="image" src="https://github.com/user-attachments/assets/49934dfd-343e-4c56-9ec3-2f7d4cc5da5e" />
+   > Select the new profile <img width="246" height="161" alt="image" src="https://github.com/user-attachments/assets/d2ef461f-b66f-4661-8b0c-01c0dab10821" />
+   > Click the profile to start and run ArcGISPro and debugger
 
 ### Run / Use
 
