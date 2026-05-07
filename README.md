@@ -1,7 +1,7 @@
 <img width="1712" height="488" alt="image" src="https://github.com/user-attachments/assets/7e85b3c4-6016-424b-881d-04c1fc777f5a" />
 
 # LFTFC
-Source code for the LANDFIRE Total Fuel Change Tool
+Source code for the LANDFIRE Total Fuel Change ArcGISPro Addin toolbar
 
 Information and compiled ArcPro Addin available at: [LANDFIRE Resources](https://landfire.gov/resources/lftfc)
 
