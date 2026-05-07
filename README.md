@@ -33,14 +33,16 @@ Before you begin, ensure you have the following software installed:
 
 To build the add-in, follow these steps:
 
-1. Clone the repository. <img width="374" height="127" alt="image" src="https://github.com/user-attachments/assets/1f8c28f6-3b86-44df-ba4c-272bdf3cbdd3" />
-2. Set Repository location to: https://github.com/firelab/LFTFC and Set Path to a new folder location <img width="633" height="255" alt="image" src="https://github.com/user-attachments/assets/85ef9f78-d02f-462a-a6ec-a5c2df831af8" />
-3. Click "Clone" <img width="266" height="108" alt="image" src="https://github.com/user-attachments/assets/fe1e4582-187d-401b-855d-d037d47e72af" />
-4. Open the Visual Studio solution in Visual Studio 2022.
-5. In the solution, ensure the ArcGIS Pro SDK packages and references resolve. Install the ArcGIS Pro SDK if missing.
-6. Add manifest file. (Right-click "My Project" folder > Add > New Item > Select "Application Manifest File" > Click "Add" Button. 
-7. Build the add-in by Right-clicking Solution > Build Solution.
-8. To Run ArcGISPro in Debug.
+1. Clone the repository.
+   > A) Start a new instance of Visual Studio 2022
+   B) Click "Clone a repository" <img width="374" height="127" alt="image" src="https://github.com/user-attachments/assets/1f8c28f6-3b86-44df-ba4c-272bdf3cbdd3" />
+   C) Set Repository location to: https://github.com/firelab/LFTFC and Set Path to a new folder location <img width="633" height="255" alt="image" src="https://github.com/user-attachments/assets/85ef9f78-d02f-462a-a6ec-a5c2df831af8" />
+2. Click "Clone" <img width="266" height="108" alt="image" src="https://github.com/user-attachments/assets/fe1e4582-187d-401b-855d-d037d47e72af" />
+3. Open the Visual Studio solution in Visual Studio 2022.
+4. In the solution, ensure the ArcGIS Pro SDK packages and references resolve. Install the ArcGIS Pro SDK if missing.
+5. Add manifest file. (Right-click "My Project" folder > Add > New Item > Select "Application Manifest File" > Click "Add" Button. 
+6. Build the add-in by Right-clicking Solution > Build Solution.
+7. To Run ArcGISPro in Debug.
    > A) Select the dropdown > B) LFTFC_Pro Debug Properties <img width="257" height="156" alt="image" src="https://github.com/user-attachments/assets/7b859952-e729-46ea-ba6e-d1cbb6169f40" />
    B) Create a new profile <img width="166" height="99" alt="image" src="https://github.com/user-attachments/assets/4e2380ad-339c-4a4b-93a2-04b2daaf022f" />
    > C) Executable <img width="144" height="115" alt="image" src="https://github.com/user-attachments/assets/7c232d6b-d794-410e-9bed-b4ce318ec458" />
