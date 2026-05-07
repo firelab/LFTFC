@@ -42,8 +42,8 @@ To build the add-in, follow these steps:
 7. To Run ArcGISPro in Debug.
    > A) Select the dropdown > B) LFTFC_Pro Debug Properties <img width="257" height="156" alt="image" src="https://github.com/user-attachments/assets/7b859952-e729-46ea-ba6e-d1cbb6169f40" />
    B) Create a new profile <img width="166" height="99" alt="image" src="https://github.com/user-attachments/assets/4e2380ad-339c-4a4b-93a2-04b2daaf022f" />
-   C) Executable <img width="144" height="115" alt="image" src="https://github.com/user-attachments/assets/7c232d6b-d794-410e-9bed-b4ce318ec458" />
-   D) Rename the new profile if you want. <img width="243" height="175" alt="image" src="https://github.com/user-attachments/assets/6dc01173-2efb-4c50-984c-0166cbd6a274" />
+   > C) Executable <img width="144" height="115" alt="image" src="https://github.com/user-attachments/assets/7c232d6b-d794-410e-9bed-b4ce318ec458" />
+   < D) Rename the new profile if you want. <img width="243" height="175" alt="image" src="https://github.com/user-attachments/assets/6dc01173-2efb-4c50-984c-0166cbd6a274" />
    E) Browse to set ArcGISPro.exe as the executable and close <img width="419" height="89" alt="image" src="https://github.com/user-attachments/assets/49934dfd-343e-4c56-9ec3-2f7d4cc5da5e" />
    F) Select the new profile <img width="246" height="161" alt="image" src="https://github.com/user-attachments/assets/d2ef461f-b66f-4661-8b0c-01c0dab10821" />
    G) Click the profile to start and run ArcGISPro and debugger
