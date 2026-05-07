@@ -40,7 +40,7 @@ To build the add-in, follow these steps:
    > > > > D) Click "Clone" <img width="266" height="108" alt="image" src="https://github.com/user-attachments/assets/fe1e4582-187d-401b-855d-d037d47e72af" />
 2. Open the Visual Studio solution in Visual Studio 2022.
 3. In the solution, ensure the ArcGIS Pro SDK packages and references resolve. Install the ArcGIS Pro SDK if missing.
-4. Add manifest file. (Right-click "My Project" folder > Add > New Item > Select "Application Manifest File" > Click "Add" Button. 
+4. Add manifest file. (Right-click "My Project" folder > Add > New Item > Select "Application Manifest File" > Click "Add" Button). 
 5. Build the add-in by Right-clicking Solution > Build Solution.
 6. Set ArcGISPro to run in debugger.
    > A) Select the dropdown > LFTFC_Pro Debug Properties <img width="257" height="156" alt="image" src="https://github.com/user-attachments/assets/7b859952-e729-46ea-ba6e-d1cbb6169f40" />
