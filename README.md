@@ -32,7 +32,7 @@ Before you begin, ensure you have the following software installed:
 
 ### CLONE/CHECK ArcGIS Pro environment for PyWin32
 1.Check to see if you already have the PyWin32 package (If it is missing go to step 2)
-<img width="1098" height="450" alt="pywin32_default" src="https://github.com/user-attachments/assets/c9a88382-3a86-4531-a6df-ffe943fc8d16" />
+<img width="1098" height="510" alt="CheckForpywin32" src="https://github.com/user-attachments/assets/0df9cbc1-c2b8-4883-92d8-c4f367409d85" />
 2.Clone the environment
 <img width="1282" height="710" alt="clone_environment_help" src="https://github.com/user-attachments/assets/972920c9-3629-479d-92df-09495249e095" />
 3.Add and activate
