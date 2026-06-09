@@ -28,6 +28,15 @@ Before you begin, ensure you have the following software installed:
 - **Visual Studio 2022**: Make sure you have the VB.NET workload installed.
 - **Microsoft Access (64-bit)**: Required for Access database (`LF_TFC_Toolbar.mdb`) and to run features that manipulate the MDB directly.
 - **The current Access Database can be found at**: [LANDFIRE Resources](https://landfire.gov/resources/lftfc) in the setup file.
+- **Requires PyWin32 python package in ArcGIS Pro (SEE BELOW HOW TO CLONE/CHECK ENVIRONMENT)
+
+### CLONE/CHECK ArcGIS Pro environment for PyWin32
+1.Check to see if you already have the PyWin32 package (If it is missing go to step 2)
+<img width="1098" height="450" alt="pywin32_default" src="https://github.com/user-attachments/assets/c9a88382-3a86-4531-a6df-ffe943fc8d16" />
+2.Clone the environment
+<img width="1282" height="710" alt="clone_environment_help" src="https://github.com/user-attachments/assets/972920c9-3629-479d-92df-09495249e095" />
+3.Add and activate
+<img width="637" height="473" alt="Add_pywin32" src="https://github.com/user-attachments/assets/507da7f9-9cf4-469e-bbd7-79719f9425c1" />
 
 ### Build
 
