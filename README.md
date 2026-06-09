@@ -36,7 +36,7 @@ Before you begin, ensure you have the following software installed:
 2.Clone the environment
 <img width="1282" height="710" alt="clone_environment_help" src="https://github.com/user-attachments/assets/972920c9-3629-479d-92df-09495249e095" />
 3.Add and activate
-<img width="637" height="473" alt="Add_pywin32" src="https://github.com/user-attachments/assets/507da7f9-9cf4-469e-bbd7-79719f9425c1" />
+> <img width="637" height="473" alt="Add_pywin32" src="https://github.com/user-attachments/assets/507da7f9-9cf4-469e-bbd7-79719f9425c1" />
 
 ### Build
 
