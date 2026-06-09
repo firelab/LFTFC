@@ -3,6 +3,9 @@
 All notable changes to LFTFC_Pro. Entries are listed newest first. Dates use ISO format (YYYY-MM-DD).
 Branches are the versions and main is development.
 
+## v5.00 — 2026-06-09
+- Added: Tools Folder, Python Toolbox, Pytool calculates pixel counts (FASTER)
+-
 ## v4.04 — 2026-04-15
 - Fix: Resolved unexpecteded error in 'DistGraph' when viewing the distribution line graphs.
 - Includes earlier changes.
