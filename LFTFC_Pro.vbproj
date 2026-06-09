@@ -11,7 +11,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <MyType>WindowsForms</MyType>
     <StartupObject>LFTFC_Pro.My.MyApplication</StartupObject>
-    <Version>4.0.4</Version>
+    <Version>5.0.0</Version>
     <NuGetAuditMode>all</NuGetAuditMode>
     <ApplicationManifest>My Project\app.manifest</ApplicationManifest>
   </PropertyGroup>
@@ -30,6 +30,7 @@
     <None Remove="Images\LFTFCTBRule.png" />
     <None Remove="Images\LFTFCTBWorkingDir.png" />
     <None Remove="Images\LFTFCTTAMU.png" />
+    <None Remove="tools\SetInitialFuelPixels.pyt" />
   </ItemGroup>
   <ItemGroup>
     <COMReference Include="ADODB">
@@ -53,6 +54,9 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Config.daml" />
+    <Content Include="tools\SetInitialFuelPixels.pyt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Resource Include="Images\AddInDesktop16.png" />
     <Resource Include="Images\AddInDesktop32.png" />
     <Content Include="Images\LFTFCTBAbout.png" />

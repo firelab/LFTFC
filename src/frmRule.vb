@@ -1,12 +1,27 @@
 ﻿'System.Windows.Forms.DataVisualization.Charting
 Imports System.Data
 Imports System.Drawing
+Imports System.IO
 Imports System.Threading
 Imports System.Windows.Forms
+'Imports ArcGIS.Core.Internal.CIM
+Imports ArcGIS.Desktop.Core
+Imports ArcGIS.Desktop.Core.Geoprocessing
+'Imports ArcGIS.Desktop.Internal.Mapping.Views.PropertyPages.Map.TransformationViewModel
 Imports ArcGIS.Desktop.Mapping.Events
 Imports FastReport.DataVisualization.Charting
+Imports Windows.Win32.System.Diagnostics
+Imports ArcGIS.Desktop.Framework
+Imports ArcGIS.Desktop.Framework.AddIn
+Imports ArcGIS.Desktop.Framework.Contracts
 
 Public Class frmRule
+
+    ' Stored constructor parameters
+    Private _comboR As String
+    Private _rulesR As String
+    Private _muName As String
+
     Private strSQL As String                                                        'SQL variable for this module
     Private strTempEVT As String                                                    'Stores the current EVT value before clearing the cmbEVT combobox
     Private comboR As String                                                        'Stores the combo table name for rule making
@@ -21,11 +36,68 @@ Public Class frmRule
     Private chrtCompFM As Chart
     Private startIntervalMarque As Date = Date.Now                                  'Stores start time
 
+
+    'Private Async Function PixelPYT(ByVal thetool As String, ByVal myParams As List(Of String), ByVal MU As String) As Task(Of Boolean)
+
+    '    ' Create the popup window
+    '    Dim working = New WorkingWindow()
+
+    '    ' Set ArcGIS Pro's main window as the owner (so it centers correctly)
+    '    Dim helper = New System.Windows.Interop.WindowInteropHelper(working)
+    '    helper.Owner = Process.GetCurrentProcess().MainWindowHandle
+
+    '    ' SHOW the popup
+    '    working.Show()
+    '    ' Pause to allow popup to render
+    '    Await Task.Yield()
+
+    '    ' OPTIONAL: Freeze ArcGIS Pro UI
+    '    ProApp.Current.MainWindow.IsEnabled = False
+
+    '    Try
+
+    '        Dim pixel_result As IGPResult = Await Geoprocessing.ExecuteToolAsync(thetool, myParams, Nothing)
+
+    '        ' Close popup
+    '        working.Close()
+    '        ' Re-enable ArcGIS Pro UI
+    '        ProApp.Current.MainWindow.IsEnabled = True
+
+    '        Return (Not pixel_result.IsFailed)
+
+    '    Catch ex As Exception
+    '        working.Close()
+    '        ProApp.Current.MainWindow.IsEnabled = True
+    '        MessageBox.Show(ex.ToString(), "pyt data")
+    '    End Try
+
+    'End Function
     Public Sub New(ByVal setComboR As String, ByVal setRulesR As String, ByVal SetMUName As String)
         ' This call is required by the Windows Form Designer.
         InitializeComponent()
 
-        ' Add any initialization after the InitializeComponent() call.
+        ' Save initial values (no async allowed in constructor)
+        _comboR = setComboR
+        _rulesR = setRulesR
+        _muName = SetMUName
+
+        ' Hide the form until after the python code is done
+        Me.Hide()
+
+    End Sub
+
+    Public Async Function StartAsync() As Task
+
+        Await InitializeFormAsync(_comboR, _rulesR, _muName)
+
+        ' Show the Form
+        Me.Show()
+        Me.Activate()
+    End Function
+
+    Private Async Function InitializeFormAsync(setComboR As String,
+                                               setRulesR As String,
+                                               MU As String) As Task
 
         'Set local path variable
         strProjectPath = gs_ProjectPath
@@ -36,6 +108,18 @@ Public Class frmRule
         Dim LUT_Num As String 'Set the lookup number field
         Dim PCUprocessed As Integer 'Stores how have rules have been processed
         Dim rs1 As New ADODB.Recordset                                  'recordset for data
+
+        ' Toolbox Parameters
+        Dim myParams As New List(Of String)
+        myParams.Add(strProjectPath) ' project path
+        myParams.Add(MU) ' mu
+
+        'Dim toolboxPath As String = "E:\e_GIS\LFTFC\repos\v4.04\tools\SetInitialFuelPixels.pyt"
+
+        Dim tool As String = "Rules_Setup"
+        Dim thetool As String = Path.Combine(gs_toolboxpath, tool)
+
+        Dim pixel_result = Await gt_PixelPYT(thetool, myParams, MU)
 
         Dim dbconn As New ADODB.Connection                              'DB connection
         dbconn.ConnectionString = gs_DBConnection &
@@ -59,7 +143,7 @@ Public Class frmRule
             'Set the MU
             comboR = setComboR
             rulesR = setRulesR
-            Text = "Fuel Rules for MU " & SetMUName
+            Text = "Fuel Rules for MU " & MU
 
             gs_EVTPixelCount(comboR, rulesR, EVTPixelCountCollection, strProjectPath) 'Totals count of pixels/evt and stores them in m_EVTPixelCountCollection
 
@@ -94,48 +178,6 @@ Public Class frmRule
             cmbEVT.Items.Clear()
             gf_SetControl(cmbEVT, strSQL, strProjectPath, rdoName.Checked)
             cmbEVT.SelectedIndex = 0
-
-            '**************Check all rules for pixel count and calculate if needed
-            '****Get all EVTs and DISTs for all the rules that exist in the CMB
-            strSQL = "SELECT " & rulesR & ".EVT, " & rulesR & ".DIST, " & rulesR & ".OnOff, " & rulesR & ".PixelCount " &
-                     "FROM " & comboR & " INNER JOIN " & rulesR & " ON (" & comboR & ".EVTR = " & rulesR & ".EVT) " &
-                     "AND (" & comboR & ".DIST = " & rulesR & ".DIST) " &
-                     "GROUP BY " & rulesR & ".EVT, " & rulesR & ".DIST, " & rulesR & ".OnOff, " & rulesR & ".PixelCount " &
-                     "HAVING (((" & rulesR & ".OnOff)='On') AND ((" & rulesR & ".PixelCount)='')) OR (((" & rulesR & ".PixelCount) Is Null));"
-            rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-
-            '****Get an instance of the progress bar for pixel update
-            Dim frmPixelUpdate As New frmPixelCountUpdate(rs1.RecordCount)
-            frmPixelUpdate.Show()
-
-            '****Run through all of the records and calc pixels where needed
-            PCUprocessed = 0
-
-            Do Until rs1.EOF = True
-                PCUprocessed = PCUprocessed + 1
-
-                frmPixelUpdate.ChangeProcessText("EVT: " & rs1.Fields!EVT.Value & "   Dist: " & rs1.Fields!DIST.Value)
-                gr_MakeRuleset(rs1.Fields!EVT.Value, rs1.Fields!DIST.Value, comboR, rulesR,
-                              RulesetCollection, EVTPixelCountCollection, strProjectPath)
-                'Update progress
-                If PCUprocessed = 5 Then
-                    'Change progress
-                    frmPixelUpdate.ChangeProgress(PCUprocessed)
-                    PCUprocessed = 0
-
-                    'Check for cancel
-                    If frmPixelUpdate.CancelSubmitted = True Then
-                        Exit Do
-                    End If
-                End If
-
-                rs1.MoveNext()
-            Loop
-
-            'Close pixel update form
-            frmPixelUpdate.Close()
-            frmPixelUpdate = Nothing
-            '**************Finished
 
             'Make rulesets and display them
             gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR,
@@ -172,7 +214,7 @@ Public Class frmRule
 
             MsgBox("Error in frmRule New - " & ex.Message)
         End Try
-    End Sub
+    End Function
 
     Private Sub frmFUEL_ResizeEnd(ByVal sender As Object, ByVal e As System.EventArgs) Handles MyBase.ResizeEnd
         Try
@@ -748,17 +790,17 @@ Public Class frmRule
         If Math.Round(lngPixelsPerRulesetAll / lngTotPixelsPerEVT * 100, 3) > 100 Then
             'If percentage is over 100% it displays "Over 100%"
             lblPixelsLeftOver.Text = "Two or more rules are overlapping in Cover and/or Height!"
-            lblPixelsLeftOver.BackColor = Color.Red
+            lblPixelsLeftOver.BackColor = Drawing.Color.Red
         Else
             'Calcs the total pixels left over not assigned to rules
             If (lngTotPixelsPerEVT - (lngPixelsPerRulesetAll + lngPixelsPerRulesetB _
                                       + lngPixelsPerRulesetW + lngPixelsPerRulesetBW) = 0) Then
                 With lblPixelsLeftOver
-                    .BackColor = Color.PaleGreen
+                    .BackColor = Drawing.Color.PaleGreen
                     .Text = "No pixels are left behind."
                 End With
             Else
-                lblPixelsLeftOver.BackColor = Color.Red
+                lblPixelsLeftOver.BackColor = Drawing.Color.Red
                 lblPixelsLeftOver.Text = "Pixels left behind: " & lngTotPixelsPerEVT - (lngPixelsPerRulesetAll _
                                         + lngPixelsPerRulesetB + lngPixelsPerRulesetW + lngPixelsPerRulesetBW)
             End If
@@ -766,7 +808,7 @@ Public Class frmRule
     End Sub
 
     Public Sub GetEVTDescription()
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
+        Dim rs1 As New ADODB.Recordset                                  'recordset for dataDrawing.
 
         Dim dbconn As New ADODB.Connection                              'DB connection
         dbconn.ConnectionString = gs_DBConnection &
@@ -1133,7 +1175,7 @@ Public Class frmRule
             .AxisY.MajorGrid.Enabled = True
             .AxisY.MajorGrid.LineWidth = 1
             .AxisY.MajorGrid.LineDashStyle = ChartDashStyle.Solid
-            .AxisY.MajorGrid.LineColor = Color.Blue
+            .AxisY.MajorGrid.LineColor = Drawing.Color.Blue
             'Set Y-Axis2
             .AxisY2.Minimum = 0
             .AxisY2.IntervalAutoMode = IntervalAutoMode.VariableCount
@@ -1391,7 +1433,7 @@ Public Class frmRule
                             .ChartType = SeriesChartType.StackedColumn
                             '.ChartType = SeriesChartType.Line
                             '.ChartType = SeriesChartType.Spline
-                            .Color = Color.FromArgb(rnd.Next(50, 200), rnd.Next(50, 200), rnd.Next(50, 200))   'Assign a color.
+                            .Color = Drawing.Color.FromArgb(rnd.Next(50, 200), rnd.Next(50, 200), rnd.Next(50, 200))   'Assign a color.
                         End With
 
                         'Get canopy values for the series
@@ -1484,7 +1526,7 @@ Public Class frmRule
                             'Set series chart type
                             .ChartType = SeriesChartType.Line
                             '.ChartType = SeriesChartType.Candlestick
-                            .Color = Color.FromArgb(rnd.Next(50, 200), rnd.Next(50, 200), rnd.Next(50, 200))   'Assign a color.
+                            .Color = Drawing.Color.FromArgb(rnd.Next(50, 200), rnd.Next(50, 200), rnd.Next(50, 200))   'Assign a color.
                         End With
                         Series1Index = chrtDist.Series.Count - 1                                        'Get starting count before adding CBH and CBD series
                         rs1.Close()
@@ -1676,7 +1718,7 @@ Public Class frmRule
         If CalcCBDGLM > 45 Then CalcCBDGLM = 45 'Check to make sure CBD does not exceed 45
     End Function
 
-    Private Function AlreadySelected(ByVal cmbFM As ComboBox) As Boolean
+    Private Function AlreadySelected(ByVal cmbFM As System.Windows.Forms.ComboBox) As Boolean
         AlreadySelected = False
         If cmbFM.Text = "None" Then
             'do nothing it stays false
@@ -2256,8 +2298,8 @@ Public Class frmRule
                             "'Custom')"
             dbconn.Execute(strSQL)
 
-            Threading.Thread.Sleep(1000) 'Let the query catchup
-
+            'Threading.Thread.Sleep(1000) 'Let the query catchup
+            System.Threading.Thread.Sleep(1000)
             'Close the interface
             cmdCustomFM.Text = "Custom" & vbCrLf & "FM"
             grpCustFM.Visible = False
@@ -2342,7 +2384,7 @@ Public Class frmRule
                          "WHERE FMNum = " & cmbDefaultFM.Text
                 dbconn.Execute(strSQL)
 
-                Threading.Thread.Sleep(1000) 'Give the database a change to catchup
+                Thread.Sleep(1000) 'Give the database a change to catchup
 
                 'Reset the comboxes
                 cmbFM1.Items.Clear()
@@ -2394,7 +2436,7 @@ Public Class frmRule
     End Sub
 
     Private Sub lstVwRulesets_MouseDown(ByVal sender As Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles lstVwRulesets.MouseDown
-        Dim MousePt As Point
+        Dim MousePt As Drawing.Point
         Dim Index As Integer
 
         If e.Button = System.Windows.Forms.MouseButtons.Right Then
@@ -2605,7 +2647,7 @@ Public Class frmRule
         cmsLowHigh.Items.Clear()
     End Sub
 
-    Private Sub PopCMSEditRule(ByVal strClickedLowHigh As String, ByVal MPoint As Point)
+    Private Sub PopCMSEditRule(ByVal strClickedLowHigh As String, ByVal MPoint As Drawing.Point)
         Dim strNum As String
         Dim strCode As String
 
