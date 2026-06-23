@@ -31,6 +31,8 @@
     <None Remove="Images\LFTFCTBWorkingDir.png" />
     <None Remove="Images\LFTFCTTAMU.png" />
     <None Remove="tools\SetInitialFuelPixels.pyt" />
+    <None Remove="tools\SetInitialFuelPixels.pyt.xml" />
+    <None Remove="tools\SetInitialFuelPixels.Rules_Setup.pyt.xml" />
   </ItemGroup>
   <ItemGroup>
     <COMReference Include="ADODB">
@@ -55,6 +57,12 @@
   <ItemGroup>
     <Content Include="Config.daml" />
     <Content Include="tools\SetInitialFuelPixels.pyt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="tools\SetInitialFuelPixels.pyt.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="tools\SetInitialFuelPixels.Rules_Setup.pyt.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Resource Include="Images\AddInDesktop16.png" />
