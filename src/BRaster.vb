@@ -1,9 +1,16 @@
-﻿Imports ArcGIS.Desktop.Framework.Contracts
+﻿Imports System.IO
+Imports System.Windows.Media
+Imports ArcGIS.Desktop.Framework.Contracts
+Imports ArcGIS.Desktop.Internal.Mapping.Locate.Controls
 
 Friend Class BRaster
     Inherits Button
 
-    Protected Overrides Sub OnClick()
+    Protected Overrides Async Sub OnClick()
+        'Set local path variable
+        Dim strProjectPath = gs_ProjectPath
+        Dim MU = gs_MU
+
         'Set active map pane
         gs_SetActiveLFTFCPane()
 
@@ -18,14 +25,30 @@ Friend Class BRaster
         Else
             Try
                 'Open the fuel rules to update the pixel counts
-                Dim FUELRules = New frmRule(gs_MU() + "_CMB", gs_MU() + "_Rulesets", gs_MU())
-                FUELRules = Nothing
+                'Dim FUELRules = New frmRule(gs_MU() + "_CMB", gs_MU() + "_Rulesets", gs_MU())
+                'Await FUELRules.StartAsync()
+                'FUELRules = Nothing
 
                 'Check for index
                 gf_CheckForDBIndex(gs_ProjectPath, gs_MU())
 
-                'Open Create Fuel GRID
                 Dim FUELGrid = New frmGRID()
+
+                ' Hide before running python
+                FUELGrid.Hide()
+
+                ' Toolbox Parameters
+                Dim myParams As New List(Of String)
+                myParams.Add(strProjectPath) ' project path
+                myParams.Add(MU) ' mu
+
+                Dim tool As String = "Rules_Setup"
+                Dim thetool As String = Path.Combine(gs_toolboxpath, tool)
+
+                ' Run shared python call
+                Await gt_PixelPYT(thetool, myParams, gs_MU())
+
+                'Open Create Fuel GRID
                 FUELGrid.Show()
                 FUELGrid = Nothing
             Catch ex As Exception

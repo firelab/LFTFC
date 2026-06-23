@@ -28,6 +28,14 @@ Module GeneralSettings
         End Get
     End Property
 
+    Public ReadOnly Property gs_toolboxpath() As String
+        Get
+            'Make install path constant
+            Dim installPath As String = Path.GetDirectoryName(Reflection.Assembly.GetExecutingAssembly().Location)
+            gs_toolboxpath = Path.Combine(installPath, "tools", "SetInitialFuelPixels.pyt")
+        End Get
+    End Property
+
     Public Property gs_ProjectPath() As String
         Get
             gs_ProjectPath = strProjPath
