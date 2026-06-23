@@ -16,6 +16,7 @@ See the [LICENSE](LICENSE) file for licensing information.
 ## Directories:
 - images -> images for icons
 - src -> source files
+- tools -> ArcPro python custom tools
 
 ## Getting Started
 
