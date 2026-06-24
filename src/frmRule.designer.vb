@@ -792,7 +792,7 @@ Partial Class frmRule
         grpCustFM.Controls.Add(rdo10H)
         grpCustFM.Controls.Add(rdo1H)
         grpCustFM.Font = New System.Drawing.Font("Comic Sans MS", 8.25F)
-        grpCustFM.Location = New System.Drawing.Point(108, 88)
+        grpCustFM.Location = New System.Drawing.Point(2, 4)
         grpCustFM.Name = "grpCustFM"
         grpCustFM.Size = New System.Drawing.Size(797, 111)
         grpCustFM.TabIndex = 121
