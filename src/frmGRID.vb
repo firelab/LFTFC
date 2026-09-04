@@ -1308,8 +1308,9 @@ CloseAndExit:
                             'Remove FuelLayer
                             container.RemoveLayer(FuelLayer)
                         End If
-                        'Remove tempFuel
-                        container.RemoveLayer(tempLayer)
+                        If fuel.Equals(FuelList.Last) Then
+                            container.RemoveLayer(tempLayer)         'Remove tempFuel
+                        End If
                     Next
                     container.RemoveStandaloneTable(LUT_DBF) 'Remove the dbf lut
                     container.RemoveLayer(muLayer)      'Remove The make raster layer of MU
