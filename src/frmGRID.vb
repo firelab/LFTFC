@@ -292,6 +292,7 @@ Public Class frmGRID
 CloseAndExit:
         Close()
         Exit Sub
+
     End Sub
 
     Public Class Fuel
@@ -1308,13 +1309,17 @@ CloseAndExit:
                             'Remove FuelLayer
                             container.RemoveLayer(FuelLayer)
                         End If
-                        'Remove tempFuel
-                        container.RemoveLayer(tempLayer)
+
+                        If fuel.Equals(FuelList.Last) Then
+                            container.RemoveLayer(tempLayer)         'Remove tempFuel
+                        End If
                     Next
-                    container.RemoveStandaloneTable(LUT_DBF) 'Remove the dbf lut
-                    container.RemoveLayer(muLayer)      'Remove The make raster layer of MU
 
                     MessageBox.Show("Finished! Rasters are in:" + strProjectPath + "\Output")
+
+                    container.RemoveStandaloneTable(LUT_DBF) 'Remove the dbf lut
+                    container.RemoveLayer(muLayer)           'Remove The make raster layer of MU
+
                 Catch ex As Exception
                     Dim errMessageString As String = ""
                     errMessageString = errMessageString & ex.Message
