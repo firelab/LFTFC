@@ -3,10 +3,14 @@
 All notable changes to LFTFC_Pro. Entries are listed newest first. Dates use ISO format (YYYY-MM-DD).
 Branches are the versions and main is development.
 
+## v4.04 — 2026-09-04
+- Fix: CH raster production issue for small datasets
+- Includes earlier changes.
+  
 ## v4.04 — 2026-04-15
 - Fix: Resolved unexpecteded error in 'DistGraph' when viewing the distribution line graphs.
 - Includes earlier changes.
-- 
+  
 ## v4.03 — 2025-12-23
 - Fix: Resolve error in `SetRasterValues` when the ArcGIS Pro container has no standalone tables to remove (ArcGIS Pro 3.5).
 - Includes earlier changes.
