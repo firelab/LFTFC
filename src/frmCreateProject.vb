@@ -23,15 +23,17 @@
             cmdDefault.Enabled = False
             cmdImport.Enabled = False
 
-            System.IO.Directory.CreateDirectory(strProjectPath & "\" & txtProjName.Text)
+            IO.Directory.CreateDirectory(strProjectPath & "\" & txtProjName.Text)
             gs_ProjectPath = strProjectPath & "\" & txtProjName.Text
 
-            FileIO.FileSystem.CopyFile(gs_Install_Path & "\" & gs_LFTFCDBName,
-                                gs_ProjectPath() & "\" & gs_LFTFCDBName, Microsoft.VisualBasic.FileIO.UIOption.AllDialogs)
+            FileIO.FileSystem.CopyFile(gs_Install_Path & "\" & gs_LFTFCSQliteName,
+                                gs_ProjectPath() & "\" & gs_LFTFCSQliteName, FileIO.UIOption.AllDialogs)
+            'FileIO.FileSystem.CopyFile(gs_Install_Path & "\" & gs_LFTFCDBName,
+            '                    gs_ProjectPath() & "\" & gs_LFTFCDBName, FileIO.UIOption.AllDialogs)
 
-            System.IO.Directory.CreateDirectory(gs_ProjectPath() & "\Input")
-            System.IO.Directory.CreateDirectory(gs_ProjectPath() & "\MU")
-            System.IO.Directory.CreateDirectory(gs_ProjectPath() & "\Output")
+            IO.Directory.CreateDirectory(gs_ProjectPath() & "\Input")
+            IO.Directory.CreateDirectory(gs_ProjectPath() & "\MU")
+            IO.Directory.CreateDirectory(gs_ProjectPath() & "\Output")
 
             Close()
             gs_validProject = True
@@ -71,24 +73,26 @@
                 .Description = "Select Project Directory to import from"
                 If .ShowDialog = DialogResult.OK Then
 
-                    If System.IO.Directory.Exists(strProjectPath & "\" & txtProjName.Text) = False Then
-                        System.IO.Directory.CreateDirectory(strProjectPath & "\" & txtProjName.Text)
+                    If IO.Directory.Exists(strProjectPath & "\" & txtProjName.Text) = False Then
+                        IO.Directory.CreateDirectory(strProjectPath & "\" & txtProjName.Text)
                     Else
-                        Throw New System.IO.IOException("Destination directory already exists: " _
+                        Throw New IO.IOException("Destination directory already exists: " _
                                                         & strProjectPath & "\" & txtProjName.Text)
                     End If
 
                     gs_ProjectPath = strProjectPath & "\" & txtProjName.Text
 
-                    FileIO.FileSystem.CopyFile(.SelectedPath & "\LF_TFC_Toolbar.mdb", gs_ProjectPath() & "\" &
-                                               gs_LFTFCDBName, Microsoft.VisualBasic.FileIO.UIOption.AllDialogs)
+                    FileIO.FileSystem.CopyFile(.SelectedPath & "\" & gs_LFTFCSQliteName, gs_ProjectPath() & "\" &
+                                               gs_LFTFCSQliteName, FileIO.UIOption.AllDialogs)
+                    'FileIO.FileSystem.CopyFile(.SelectedPath & "\LF_TFC_Toolbar.mdb", gs_ProjectPath() & "\" &
+                    '                           gs_LFTFCDBName, FileIO.UIOption.AllDialogs)
 
                     FileIO.FileSystem.CopyDirectory(.SelectedPath & "\Input", gs_ProjectPath() & "\Input" _
-                                                    , Microsoft.VisualBasic.FileIO.UIOption.AllDialogs)
+                                                    , FileIO.UIOption.AllDialogs)
                     FileIO.FileSystem.CopyDirectory(.SelectedPath & "\MU", gs_ProjectPath() & "\MU" _
-                                                    , Microsoft.VisualBasic.FileIO.UIOption.AllDialogs)
+                                                    , FileIO.UIOption.AllDialogs)
                     FileIO.FileSystem.CopyDirectory(.SelectedPath & "\Output", gs_ProjectPath() & "\Output" _
-                                                    , Microsoft.VisualBasic.FileIO.UIOption.AllDialogs)
+                                                    , FileIO.UIOption.AllDialogs)
                 End If
             End With
             Close()

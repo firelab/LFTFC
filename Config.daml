@@ -1,12 +1,11 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<ArcGIS defaultAssembly="LFTFC_Pro.dll" defaultNamespace="LFTFC_Pro" xmlns="http://schemas.esri.com/DADF/Registry" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schemas.esri.com/DADF/Registry file:///C:/Program%20Files/ArcGIS/Pro/bin/ArcGIS.Desktop.Framework.xsd">
-  <AddInInfo id="{da5c9e2f-51ef-47a1-a8dc-df4350422e4f}" version="3.0" desktopVersion="3.1.41833">
+﻿<ArcGIS defaultAssembly="LFTFC_Pro.dll" defaultNamespace="LFTFC_Pro" xmlns="http://schemas.esri.com/DADF/Registry" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schemas.esri.com/DADF/Registry file:///C:/Program%20Files/ArcGIS/Pro/bin/ArcGIS.Desktop.Framework.xsd">
+  <AddInInfo id="{da5c9e2f-51ef-47a1-a8dc-df4350422e4f}" version="5.1" desktopVersion="3.1.41833">
     <Name>LFTFC_Pro</Name>
     <Description>Facilitates editing LF rule sets to create customized surface and canopy fuel layers for local applications.</Description>
     <Image>Images\AddinDesktop32.png</Image>
     <Author>TobinSmail USDA USFS RMRS FMI, Michelle Hawks FS-FSIC-Enterprise Program</Author>
     <Company>LANDFIRE Interagency Program</Company>
-    <Date>06/09/2026 9:07:28 AM</Date>
+    <Date>09/08/2026 9:07:28 AM</Date>
     <!-- Note subject can be one or more of these topics:
                     Content, Framework, Editing, Geodatabase, Geometry, Geoprocessing, Layouts, Map Authoring, Map Exploration -->
   </AddInInfo>
@@ -21,8 +20,7 @@
       <groups>
         <!-- comment this out if you have no controls on the Addin tab to avoid
               an empty group-->
-        <group id="LFTFC_Pro_Group1" caption="LFTFC_Pro" appearsOnAddInTab="true">
-          <!-- host controls within groups -->
+        <group id="LFTFC_Pro_Group1" caption="LFTFC_Pro" appearsOnAddInTab="true" keytip="LF1">
           <button refID="LFTFC_Pro_BWorkingDir" size="large" />
           <button refID="LFTFC_Pro_BAMU" size="large" />
           <comboBox refID="LFTFC_Pro_BCMU" size="large" />
@@ -31,6 +29,12 @@
           <button refID="LFTFC_Pro_BRaster" size="large" />
           <button refID="LFTFC_Pro_BFuelLog" size="large" />
           <button refID="LFTFC_Pro_BAbout" size="large" />
+		  <button refID="LFTFC_Pro_ExportCSV" size="large" />
+		  <button refID="LFTFC_Pro_LoadCSV" size="large" />
+		</group>
+        <group id="LFTFC_Pro_DataPrep" caption="LFTFC_Pro" appearsOnAddInTab="true" keytip="LF2">
+          <button refID="LFTFC_Pro_Clear_PixelCount_SQL" size="large" />
+		  <button refID="LFTFC_Pro_Calc_PixelCount_SQL" size="large" />
         </group>
       </groups>
       <controls>
@@ -58,6 +62,18 @@
         </button>
         <button id="LFTFC_Pro_BAbout" caption="About LFTFC" className="BAbout" loadOnClick="true" smallImage="Images/LFTFCTBAbout.png" largeImage="Images/LFTFCTBAbout.png">
           <tooltip heading="About">LFTFC version<disabledText /></tooltip>
+        </button>
+        <button id="LFTFC_Pro_ExportCSV" caption="ExportCSV" className="ExportCSV" loadOnClick="true" smallImage="Images/SQLtoCSV.png" largeImage="Images/SQLtoCSV.png">
+          <tooltip heading="Export CSV files">Export Selected Tables to CSV<disabledText /></tooltip>
+        </button>
+        <button id="LFTFC_Pro_LoadCSV" caption="LoadCSV" className="LoadCSV" loadOnClick="true" smallImage="Images/CSVtoSQL.png" largeImage="Images/CSVtoSQL.png">
+          <tooltip heading="Import CSV">Import Edited CSV Files to SQLite<disabledText /></tooltip>
+        </button>
+        <button id="LFTFC_Pro_Clear_PixelCount_SQL" caption="Clear PixelCount SQL" className="Clear_PixelCount_SQL" loadOnClick="true" smallImage="pack://application:,,,/ArcGIS.Desktop.Resources;component/Images/GenericButtonBlue16.png" largeImage="pack://application:,,,/ArcGIS.Desktop.Resources;component/Images/GenericButtonBlue32.png">
+          <tooltip heading="Clear PixelCount SQL">Tooltip text<disabledText /></tooltip>
+        </button>
+        <button id="LFTFC_Pro_Calc_PixelCount_SQL" caption="Calc PixelCount SQL" className="Calc_PixelCount_SQL" loadOnClick="true" smallImage="pack://application:,,,/ArcGIS.Desktop.Resources;component/Images/GenericButtonBlue16.png" largeImage="pack://application:,,,/ArcGIS.Desktop.Resources;component/Images/GenericButtonBlue32.png">
+          <tooltip heading="Calc PixelCount SQL">Tooltip text<disabledText /></tooltip>
         </button>
       </controls>
     </insertModule>

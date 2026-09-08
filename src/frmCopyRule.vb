@@ -68,150 +68,162 @@ Public Class frmCopyRule
 
     End Sub
 
-    Private Sub cmdCopyRule_MouseClick(ByVal sender As Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles cmdCopyRule.MouseClick
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+    Private Sub cmdCopyRule_MouseClick(sender As Object, e As System.Windows.Forms.MouseEventArgs) Handles cmdCopyRule.MouseClick
+
+        Dim dbPath As String = System.IO.Path.Combine(strProjectPath, gs_LFTFCSQliteName)
+        Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
+        Dim strSQL As String = ""
 
         Try
+            '-------------------------------------------------------
+            ' Shared field lists (INSERT and SELECT parts)
+            '-------------------------------------------------------
+            Dim insertFields As String =
+            "(EVT, DIST, Cover_Low, Cover_High, Height_Low, Height_High, " &
+            "BPSRF, Wildcard, FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, " &
+            "CCover, CHeight, CBD13x100, CBD40x100, CBH13mx10, CBH40mx10, OnOff, Notes)"
+
+            ' Normal SELECT (when copying EVT=... from source)
+            Dim selectFields As String =
+            "Cover_Low, Cover_High, Height_Low, Height_High, BPSRF, Wildcard, " &
+            "FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, CCover, CHeight, " &
+            "CBD13x100, CBD40x100, CBH13mx10, CBH40mx10, OnOff"
+
+            ' SELECT with an EVT/DIST override (used in EVT→EVT copies)
+            Dim selectFieldsOverride As String =
+            "@evt, @dist, Cover_Low, Cover_High, Height_Low, Height_High, " &
+            "BPSRF, Wildcard, FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, CCover, " &
+            "CHeight, CBD13x100, CBD40x100, CBH13mx10, CBH40mx10, OnOff"
+
+            '-------------------------------------------------------
+            ' Confirm user intent
+            '-------------------------------------------------------
             Dim strPrompt As String
             Dim strTargetEVT As String
             Dim strTargetDIST As String
             Dim copyMU As String = cmbCopyMU.Text & "_Rulesets"
 
-            'On and off rules or just on
-            If rdoCopyOnOff.Checked = True Then
-                strPrompt = "all ON and OFF rules " & vbCrLf
+            If rdoCopyOnOff.Checked Then
+                strPrompt = "all ON and OFF rules" & vbCrLf
             Else
-                strPrompt = "all ON rules " & vbCrLf
+                strPrompt = "all ON rules" & vbCrLf
             End If
 
-            'MU or EVT if MU then only where rulesets are empty or all rulesets
-            If rdoCopyMU.Checked = True And rdoAll.Checked = True Then
-                strPrompt = strPrompt & "in management unit " & cmbCopyMU.Text & vbCrLf &
-                                        "where rules may already exist?"
-            ElseIf rdoCopyMU.Checked = True And rdoAll.Checked = False Then
-                strPrompt = strPrompt & "in management unit " & cmbCopyMU.Text & vbCrLf &
-                                        "only where rulesets are EMPTY?"
-            Else 'EVT only
-                strPrompt = strPrompt & "from EVT " & cmbCopyEVT.Text & vbCrLf &
-                                        "in management unit " & cmbCopyMU.Text & "?"
+            If rdoCopyMU.Checked AndAlso rdoAll.Checked Then
+                strPrompt &= "in management unit " & cmbCopyMU.Text & vbCrLf &
+                         "where rules may already exist?"
+            ElseIf rdoCopyMU.Checked AndAlso Not rdoAll.Checked Then
+                strPrompt &= "in management unit " & cmbCopyMU.Text & vbCrLf &
+                         "only where rulesets are EMPTY?"
+            Else
+                strPrompt &= "from EVT " & cmbCopyEVT.Text & vbCrLf &
+                         "in management unit " & cmbCopyMU.Text & "?"
             End If
 
-            If MsgBox("Are you sure you want to copy " & strPrompt, MsgBoxStyle.YesNo).Equals(vbYes) Then
-
-                strTargetEVT = gf_GetNum(cmbCopyEVT.Text, "EVT")
-                strTargetDIST = gf_GetNum(cmbCopyEVT.Text, "DIST")
-
-                If rdoCopyEVT.Checked And rdoCopyOn.Checked Then
-                    'Get the rules for the selected zone and EVT but only the rules that are turned On
-                    strSQL = "INSERT INTO " & rulesR & " ( " &
-                        "EVT, DIST, Cover_Low ,Cover_High, Height_Low, Height_High, BPSRF, Wildcard, " &
-                        "FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, CCover, CHeight, CBD13x100, CBD40x100, " &
-                        "CBH13mx10, CBH40mx10, OnOff, Notes ) " &
-                        "SELECT " & gf_GetNum(cmbEVT.Text, "EVT") & " AS EVT, " & gf_GetNum(cmbEVT.Text, "DIST") & " AS DIST, Cover_Low ,Cover_High, " &
-                        "Height_Low, Height_High, BPSRF, Wildcard, FBFM13, FBFM40, CanFM, FCCS, FLM, " &
-                        "Canopy, CCover, CHeight, CBD13x100, CBD40x100, CBH13mx10, CBH40mx10, OnOff, """ &
-                        Now.ToShortTimeString & " " & Now.ToShortDateString & " " &
-                        SN & ": Copied rule from MU - " & cmbCopyMU.Text &
-                        " EVT " & strTargetEVT & "[" & strTargetDIST & "]"" AS Notes " &
-                        "FROM " & cmbCopyMU.Text & "_Rulesets " &
-                        "WHERE (EVT = " & strTargetEVT & ") " &
-                        "And (DIST = " & strTargetDIST & ") " &
-                        "And (OnOff = 'On') " &
-                        "ORDER BY OnOff DESC, BPSRF DESC, Wildcard DESC, Cover_Low, Cover_High, Height_Low, Height_High"
-                ElseIf rdoCopyEVT.Checked And rdoCopyOnOff.Checked Then
-                    'Get the rules for the selected zone and EVT
-                    strSQL = "INSERT INTO " & rulesR & " ( " &
-                        "EVT, DIST, Cover_Low ,Cover_High, Height_Low, Height_High, BPSRF, Wildcard, " &
-                        "FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, CCover, CHeight, CBD13x100, CBD40x100, " &
-                        "CBH13mx10, CBH40mx10, OnOff, Notes ) " &
-                        "SELECT " & gf_GetNum(cmbEVT.Text, "EVT") & " AS EVT, " & gf_GetNum(cmbEVT.Text, "DIST") & " AS DIST, Cover_Low ,Cover_High, " &
-                        "Height_Low, Height_High, BPSRF, Wildcard, FBFM13, FBFM40, CanFM, FCCS, FLM, " &
-                        "Canopy, CCover, CHeight, CBD13x100, CBD40x100, CBH13mx10, CBH40mx10, OnOff, """ &
-                        Now.ToShortTimeString & " " & Now.ToShortDateString & " " &
-                        SN & ": Copied rule from MU - " & cmbCopyMU.Text &
-                        " EVT " & strTargetEVT & "[" & strTargetDIST & "]"" AS Notes " &
-                        "FROM " & cmbCopyMU.Text & "_Rulesets " &
-                        "WHERE (EVT = " & strTargetEVT & ") " &
-                        "And (DIST = " & strTargetDIST & ") " &
-                        "ORDER BY OnOff DESC, BPSRF DESC, Wildcard DESC, Cover_Low, Cover_High, Height_Low, Height_High"
-                ElseIf rdoCopyMU.Checked And rdoCopyOn.Checked And rdoAll.Checked Then
-                    'Get the rules for the entire selected Zone and only the rules that are turned On
-                    strSQL = "INSERT INTO " & rulesR & " ( " &
-                        "EVT, DIST, Cover_Low ,Cover_High, Height_Low, Height_High, BPSRF, Wildcard, " &
-                        "FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, CCover, CHeight, CBD13x100, CBD40x100, " &
-                        "CBH13mx10, CBH40mx10, OnOff, Notes ) " &
-                        "SELECT EVT, DIST, Cover_Low ,Cover_High, " &
-                        "Height_Low, Height_High, BPSRF, Wildcard, FBFM13, FBFM40, CanFM, FCCS, FLM, " &
-                        "Canopy, CCover, CHeight, CBD13x100, CBD40x100, CBH13mx10, CBH40mx10, OnOff, """ &
-                        Now.ToShortTimeString & " " & Now.ToShortDateString & " " &
-                        SN & ": Copied rule from MU - " & cmbCopyMU.Text &
-                        """ AS Notes " &
-                        "FROM " & copyMU & " " &
-                        "WHERE (OnOff = 'On') " &
-                        "ORDER BY OnOff DESC, BPSRF DESC, Wildcard DESC, Cover_Low, Cover_High, Height_Low, Height_High"
-                ElseIf rdoCopyMU.Checked And rdoCopyOnOff.Checked And rdoAll.Checked Then
-                    'Get the rules for the entire selected Zone
-                    strSQL = "INSERT INTO " & rulesR & " ( " &
-                        "EVT, DIST, Cover_Low ,Cover_High, Height_Low, Height_High, BPSRF, Wildcard, " &
-                        "FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, CCover, CHeight, CBD13x100, CBD40x100, " &
-                        "CBH13mx10, CBH40mx10, OnOff, Notes ) " &
-                        "SELECT EVT, DIST, Cover_Low ,Cover_High, " &
-                        "Height_Low, Height_High, BPSRF, Wildcard, FBFM13, FBFM40, CanFM, FCCS, FLM, " &
-                        "Canopy, CCover, CHeight, CBD13x100, CBD40x100, CBH13mx10, CBH40mx10, OnOff, """ &
-                        Now.ToShortTimeString & " " & Now.ToShortDateString & " " &
-                        SN & ": Copied rule from MU - " & cmbCopyMU.Text &
-                        """ AS Notes " &
-                        "FROM " & copyMU & " " &
-                        "ORDER BY OnOff DESC, BPSRF DESC, Wildcard DESC, Cover_Low, Cover_High, Height_Low, Height_High"
-                ElseIf rdoCopyMU.Checked And rdoCopyOnOff.Checked And rdoEmpty.Checked Then
-                    'Get rules On and Off for the entire selected Zone and insert in only where rulesets are empty
-                    strSQL = "INSERT INTO " & rulesR & " ( EVT, DIST, Cover_Low, Cover_High, Height_Low, " &
-                             "Height_High, BPSRF, Wildcard, FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, CCover, " &
-                             "CHeight, CBD13x100, CBD40x100, CBH13mx10, CBH40mx10, OnOff, Notes ) " &
-                             "SELECT " & copyMU & ".EVT, " & copyMU & ".DIST, " & copyMU & ".Cover_Low, " & copyMU & ".Cover_High, " &
-                             copyMU & ".Height_Low, " & copyMU & ".Height_High, " & copyMU & ".BPSRF, " & copyMU & ".Wildcard, " &
-                             copyMU & ".FBFM13, " & copyMU & ".FBFM40, " & copyMU & ".CanFM, " & copyMU & ".FCCS, " &
-                             copyMU & ".FLM, " & copyMU & ".Canopy, " & copyMU & ".CCover, " & copyMU & ".CHeight, " &
-                             copyMU & ".CBD13x100, " & copyMU & ".CBD40x100, " & copyMU & ".CBH13mx10, " & copyMU & ".CBH40mx10, " &
-                             copyMU & ".OnOff, """ & SN & ": Copied rule from MU - " & cmbCopyMU.Text & """ AS Notes " &
-                             "FROM " & copyMU & " WHERE (((Exists (SELECT 1 FROM " & rulesR & " " &
-                             "WHERE " & rulesR & ".EVT=" & copyMU & ".EVT AND " & copyMU & ".DIST=" & rulesR & ".DIST))=False)) " &
-                             "ORDER BY " & copyMU & ".OnOff DESC , " & copyMU & ".BPSRF DESC , " & copyMU & ".Wildcard DESC , " &
-                             copyMU & ".Cover_Low, " & copyMU & ".Cover_High, " & copyMU & ".Height_Low, " &
-                             copyMU & ".Height_High;"
-                ElseIf rdoCopyMU.Checked And rdoCopyOn.Checked And rdoEmpty.Checked Then
-                    'Get only On rules for the entire selected Zone and insert in only where rulesets are empty
-                    strSQL = "INSERT INTO " & rulesR & " ( EVT, DIST, Cover_Low, Cover_High, Height_Low, " &
-                             "Height_High, BPSRF, Wildcard, FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, CCover, " &
-                             "CHeight, CBD13x100, CBD40x100, CBH13mx10, CBH40mx10, OnOff, Notes ) " &
-                             "SELECT " & copyMU & ".EVT, " & copyMU & ".DIST, " & copyMU & ".Cover_Low, " & copyMU & ".Cover_High, " &
-                             copyMU & ".Height_Low, " & copyMU & ".Height_High, " & copyMU & ".BPSRF, " & copyMU & ".Wildcard, " &
-                             copyMU & ".FBFM13, " & copyMU & ".FBFM40, " & copyMU & ".CanFM, " & copyMU & ".FCCS, " &
-                             copyMU & ".FLM, " & copyMU & ".Canopy, " & copyMU & ".CCover, " & copyMU & ".CHeight, " &
-                             copyMU & ".CBD13x100, " & copyMU & ".CBD40x100, " & copyMU & ".CBH13mx10, " & copyMU & ".CBH40mx10, " &
-                             copyMU & ".OnOff, """ & SN & ": Copied rule from MU - " & cmbCopyMU.Text & """ AS Notes " &
-                             "FROM " & copyMU & " WHERE (((" & copyMU & ".OnOff)='On') AND ((Exists (SELECT 1 FROM " & rulesR & " " &
-                             "WHERE " & rulesR & ".EVT=" & copyMU & ".EVT AND " & copyMU & ".DIST=" & rulesR & ".DIST))=False)) " &
-                             "ORDER BY " & copyMU & ".OnOff DESC , " & copyMU & ".BPSRF DESC , " & copyMU & ".Wildcard DESC , " &
-                             copyMU & ".Cover_Low, " & copyMU & ".Cover_High, " & copyMU & ".Height_Low, " &
-                             copyMU & ".Height_High;"
-                End If
-                dbconn.Execute(strSQL)                                                   'Run the SQL statement
-
-                Visible = False
+            If MsgBox("Are you sure you want to copy " & strPrompt, MsgBoxStyle.YesNo) <> vbYes Then
+                Exit Sub
             End If
-            If dbconn.State <> ConnectionState.Closed Then                                 'Database needs to be closed
-                dbconn = Nothing
+
+            strTargetEVT = gf_GetNum(cmbCopyEVT.Text, "EVT")
+            strTargetDIST = gf_GetNum(cmbCopyEVT.Text, "DIST")
+
+            Dim noteText As String =
+            Now.ToShortTimeString & " " &
+            Now.ToShortDateString & " " &
+            SN & ": Copied rule from MU - " &
+            cmbCopyMU.Text & " EVT " &
+            strTargetEVT & "[" & strTargetDIST & "]"
+
+            Dim noteSimple As String =
+            Now.ToShortTimeString & " " &
+            Now.ToShortDateString & " " &
+            SN & ": Copied rule from MU - " & cmbCopyMU.Text
+
+            '-------------------------------------------------------
+            ' Construct parametric SQL using shared field lists
+            '-------------------------------------------------------
+
+            If rdoCopyEVT.Checked AndAlso rdoCopyOn.Checked Then
+                ' Copy ON rules for specific EVT→EVT
+                strSQL =
+                "INSERT INTO " & rulesR & " " & insertFields & " " &
+                "SELECT " & selectFieldsOverride & ", @notes " &
+                "FROM " & copyMU & " " &
+                "WHERE EVT = @targetEvt AND DIST = @targetDist AND OnOff = 'On' " &
+                "ORDER BY OnOff DESC, BPSRF DESC, Wildcard DESC, Cover_Low, Cover_High, Height_Low, Height_High"
+
+            ElseIf rdoCopyEVT.Checked AndAlso rdoCopyOnOff.Checked Then
+                strSQL =
+                "INSERT INTO " & rulesR & " " & insertFields & " " &
+                "SELECT " & selectFieldsOverride & ", @notes " &
+                "FROM " & copyMU & " " &
+                "WHERE EVT = @targetEvt AND DIST = @targetDist " &
+                "ORDER BY OnOff DESC, BPSRF DESC, Wildcard DESC, Cover_Low, Cover_High, Height_Low, Height_High"
+
+            ElseIf rdoCopyMU.Checked AndAlso rdoCopyOn.Checked AndAlso rdoAll.Checked Then
+                strSQL =
+                "INSERT INTO " & rulesR & " " & insertFields & " " &
+                "SELECT EVT, DIST, " & selectFields & ", @notesSimple " &
+                "FROM " & copyMU & " " &
+                "WHERE OnOff = 'On' " &
+                "ORDER BY OnOff DESC, BPSRF DESC, Wildcard DESC, Cover_Low, Cover_High, Height_Low, Height_High"
+
+            ElseIf rdoCopyMU.Checked AndAlso rdoCopyOnOff.Checked AndAlso rdoAll.Checked Then
+                strSQL =
+                "INSERT INTO " & rulesR & " " & insertFields & " " &
+                "SELECT EVT, DIST, " & selectFields & ", @notesSimple " &
+                "FROM " & copyMU & " " &
+                "ORDER BY OnOff DESC, BPSRF DESC, Wildcard DESC, Cover_Low, Cover_High, Height_Low, Height_High"
+
+            ElseIf rdoCopyMU.Checked AndAlso rdoCopyOnOff.Checked AndAlso rdoEmpty.Checked Then
+                strSQL =
+                "INSERT INTO " & rulesR & " " & insertFields & " " &
+                "SELECT c.EVT, c.DIST, " & selectFields.Replace("Cover_Low", "c.Cover_Low").Replace("Cover_High", "c.Cover_High") &
+                ", @notesSimple " &
+                "FROM " & copyMU & " c " &
+                "WHERE NOT EXISTS (SELECT 1 FROM " & rulesR & " r WHERE r.EVT = c.EVT AND r.DIST = c.DIST) " &
+                "ORDER BY c.OnOff DESC, c.BPSRF DESC, c.Wildcard DESC, c.Cover_Low, c.Cover_High, c.Height_Low, c.Height_High"
+
+            ElseIf rdoCopyMU.Checked AndAlso rdoCopyOn.Checked AndAlso rdoEmpty.Checked Then
+                strSQL =
+                "INSERT INTO " & rulesR & " " & insertFields & " " &
+                "SELECT c.EVT, c.DIST, " & selectFields.Replace("Cover_Low", "c.Cover_Low").Replace("Cover_High", "c.Cover_High") &
+                ", @notesSimple " &
+                "FROM " & copyMU & " c " &
+                "WHERE c.OnOff = 'On' AND NOT EXISTS (SELECT 1 FROM " & rulesR & " r WHERE r.EVT = c.EVT AND r.DIST = c.DIST) " &
+                "ORDER BY c.OnOff DESC, c.BPSRF DESC, c.Wildcard DESC, c.Cover_Low, c.Cover_High, c.Height_Low, c.Height_High"
+
             End If
+
+            '-------------------------------------------------------
+            ' Execute using SQLiteTransaction
+            '-------------------------------------------------------
+            Using conn As New SQLite.SQLiteConnection(connString)
+                conn.Open()
+
+                Using tx As SQLite.SQLiteTransaction = conn.BeginTransaction()
+                    Using cmd As New SQLite.SQLiteCommand(strSQL, conn, tx)
+
+                        cmd.Parameters.AddWithValue("@evt", gf_GetNum(cmbEVT.Text, "EVT"))
+                        cmd.Parameters.AddWithValue("@dist", gf_GetNum(cmbEVT.Text, "DIST"))
+                        cmd.Parameters.AddWithValue("@targetEvt", strTargetEVT)
+                        cmd.Parameters.AddWithValue("@targetDist", strTargetDIST)
+                        cmd.Parameters.AddWithValue("@notes", noteText)
+                        cmd.Parameters.AddWithValue("@notesSimple", noteSimple)
+
+                        cmd.ExecuteNonQuery()
+                    End Using
+
+                    tx.Commit()
+                End Using
+            End Using
+
+            Visible = False
+
         Catch ex As Exception
-            If dbconn.State <> ConnectionState.Closed Then                                 'Database needs to be closed
-                dbconn = Nothing
-            End If
             MsgBox("Error in cmdCopyRule_MouseClick - " & ex.Message)
         End Try
+
     End Sub
 
     Private Sub cmdCopyCancel_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles cmdCopyCancel.Click

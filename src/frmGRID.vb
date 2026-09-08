@@ -1,4 +1,7 @@
-﻿Imports System.Windows.Forms
+﻿Imports System.Data
+Imports System.Data.SQLite
+Imports System.IO
+Imports System.Windows.Forms
 Imports ArcGIS.Desktop.Core
 Imports ArcGIS.Desktop.Core.Geoprocessing
 Imports ArcGIS.Desktop.Framework.Threading.Tasks
@@ -292,61 +295,89 @@ Public Class frmGRID
 CloseAndExit:
         Close()
         Exit Sub
-
     End Sub
+
+    'Access UPDATE...INNER JOIN has no SQLite equivalent — workaround as a correlated
+    'subquery for the value plus a matching EXISTS to restrict which rows are touched.
 
     Public Class Fuel
         Public Property FuelType As String
         Public Property SaveAs As String
     End Class
 
-    Private Function SetFuelDatabase(ByVal DBName As String, ByVal MUName As String) As String
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection & strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+    Private Function SetFuelDatabase(DBName As String, MUName As String) As String
+
+        Dim dbPath As String = System.IO.Path.Combine(strProjectPath, gs_LFTFCSQliteName)
+        Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
+        Dim strSQL As String = ""
 
         Try
-            'Set FuelDatabase
+            'Check for too many MU fuel grids
             If Strings.Right(DBName, 1) > 3 Then
-                MsgBox("To many diffent MU Fuel Grids being created at the same time." & vbCrLf &
-                       "Wait for some Fuel Grids to finish and try again.")
+                MsgBox("Too many different MU Fuel Grids being created at the same time." & vbCrLf &
+                   "Wait for some Fuel Grids to finish and try again.")
             Else
-                strSQL = "SELECT * INTO " & DBName & " FROM " & MUName & "_Rulesets"
-                dbconn.Execute(strSQL)
+                'SQLite equivalent of SELECT * INTO NewTable FROM OldTable
+                strSQL =
+                "CREATE TABLE " & DBName & " AS " &
+                "SELECT * FROM " & MUName & "_Rulesets"
+
+                Using conn As New SQLite.SQLiteConnection(connString)
+                    conn.Open()
+
+                    Using tx As SQLite.SQLiteTransaction = conn.BeginTransaction()
+                        Using cmd As New SQLite.SQLiteCommand(strSQL, conn, tx)
+                            cmd.ExecuteNonQuery()
+                        End Using
+                        tx.Commit()
+                    End Using
+                End Using
             End If
 
-            If dbconn.State <> System.Data.ConnectionState.Closed Then                                 'Database needs to be closed
-                dbconn = Nothing
-            End If
         Catch ex As Exception
-            If dbconn.State <> System.Data.ConnectionState.Closed Then                                 'Database needs to be closed
-                dbconn = Nothing
-            End If
-            DBName = SetFuelDatabase(Strings.Left(DBName, 12) & Strings.Right(DBName, 1) + 1, MUName)
+            'Retry with incremented last digit, identical logic to original
+            Dim newDBName As String =
+            Strings.Left(DBName, 12) & (CInt(Strings.Right(DBName, 1)) + 1).ToString()
+
+            DBName = SetFuelDatabase(newDBName, MUName)
         End Try
 
-        SetFuelDatabase = DBName
+        Return DBName
+
     End Function
 
-    Private Sub DeleteFuelDatabase(ByVal DBName As String)
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection & strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+    Private Sub DeleteFuelDatabase(DBName As String)
+
+        Dim dbPath As String = System.IO.Path.Combine(strProjectPath, gs_LFTFCSQliteName)
+        Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
+        Dim strSQL As String = ""
 
         Try
-            If Strings.Right(DBName, 1) < 4 Then
-                strSQL = "DROP TABLE " & DBName
-                dbconn.Execute(strSQL)
-                DBName = Strings.Left(DBName, 12) & Strings.Right(DBName, 1) + 1
-                DeleteFuelDatabase(DBName)
+            'Original rule: delete DBName, DBName+1, DBName+2, DBName+3 (Right() < 4)
+            If CInt(Strings.Right(DBName, 1)) < 4 Then
+
+                strSQL = "DROP TABLE IF EXISTS " & DBName
+
+                Using conn As New SQLite.SQLiteConnection(connString)
+                    conn.Open()
+
+                    Using cmd As New SQLite.SQLiteCommand(strSQL, conn)
+                        cmd.ExecuteNonQuery()
+                    End Using
+                End Using
+
+                'Increment DBName suffix just like original Access version
+                Dim nextSuffix As Integer = CInt(Strings.Right(DBName, 1)) + 1
+                Dim nextDBName As String = Strings.Left(DBName, 12) & nextSuffix.ToString()
+
+                DeleteFuelDatabase(nextDBName)
             End If
 
-            If dbconn.State <> System.Data.ConnectionState.Closed Then                 'Database needs to be closed
-                dbconn = Nothing
-            End If
         Catch ex As Exception
-            'Then there are not any fuel databases so do nothing
+            'SQLite throws if table doesn't exist beyond IF EXISTS handling.
+            'We follow the original rule: do nothing.
         End Try
+
     End Sub
 
     Private Sub cmdCancel_Click(ByVal sender As Object, ByVal e As EventArgs) Handles cmdCancel.Click
@@ -499,542 +530,652 @@ CloseAndExit:
         End If
     End Function
 
+    '---------------------------------------------------------
+    ' MODEL: FuelRow (represents one row in MUTable)
+    '---------------------------------------------------------
+    Public Class FuelRow
+        Public Property VALUE As Integer
+        Public Property COUNT As Integer
+        Public Property EVTR As Integer
+        Public Property DIST As Integer
+        Public Property EVCR As Integer
+        Public Property EVHR As Integer
+        Public Property BPSRF As Integer
+        Public Property Wildcard As String
+
+        Public Property NewFBFM13 As Integer
+        Public Property NewFBFM40 As Integer
+        Public Property NewCanFM As Integer
+        Public Property NewFCCS As Integer
+        Public Property NewFLM As Integer
+        Public Property NewCCover As Integer
+        Public Property NewCHeight As Integer
+        Public Property NewCBH13mx10 As Integer
+        Public Property NewCBH40mx10 As Integer
+        Public Property NewCBD13x100 As Integer
+        Public Property NewCBD40x100 As Integer
+        Public Property NewCanopy As Integer
+    End Class
+
+
+    '---------------------------------------------------------
+    ' MODEL: RuleRow (represents one row in RulesTable)
+    '---------------------------------------------------------
+    Public Class RuleRow
+        Public Property EVT As Integer
+        Public Property DIST As Integer
+        Public Property Cover_Low As Integer
+        Public Property Cover_High As Integer
+        Public Property Height_Low As Integer
+        Public Property Height_High As Integer
+        Public Property BPSRF As String
+        Public Property Wildcard As String
+
+        Public Property FBFM13 As Integer
+        Public Property FBFM40 As String
+        Public Property CanFM As String
+        Public Property FCCS As Integer
+        Public Property FLM As Integer
+        Public Property CCover As Integer
+        Public Property CHeight As Integer
+        Public Property CBD13x100 As Integer
+        Public Property CBD40x100 As Integer
+        Public Property CBH13mx10 As Integer
+        Public Property CBH40mx10 As Integer
+        Public Property Canopy As Integer
+        Public Property OnOff As String
+    End Class
+
     Private Sub AssignValues(ByVal FuelName As String, ByVal MUName As String, ByVal RulesTable As String)
-        'Dim rs1 As New ADODB.Recordset                                      'recordset for data
-        Dim dbconn As New ADODB.Connection                                  'DB connection
-        dbconn.ConnectionString = gs_DBConnection & strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+        Dim dbPath As String = strProjectPath & "\" & gs_LFTFCSQliteName
+        Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
 
         Try
-            Dim MUTable = MUName + "_CMB"
-            Dim adjSET As String                                            'Adjusts the SET portion of the SQL statement
-            Dim adjWHERE As String                                          'Adjusts the WHERE portion of the SQL statement
+            Dim MUTable As String = MUName + "_CMB"
+            Dim defVal As String = DEFAULT_FUEL_VAL.ToString()
 
-            'Reset selected fuel in cmbrf table variable to 9999
-            strSQL = "UPDATE " & MUTable & " " &
-                     "SET " & MUTable & ".New" & FuelName & " = 9999"
-            dbconn.Execute(strSQL)                                           'Run the SQL statement
-
-            If FuelName = "FBFM40" Then
-                adjSET = "FBFM40 = Int(Right(" & RulesTable & ".FBFM40, 3))"
-                adjWHERE = "IIf([" & RulesTable & "]![" & FuelName & "]='9999',9999,Int(Right([" & RulesTable & "]![" & FuelName & "],3)))"
-            ElseIf FuelName = "CanFM" Then
-                adjSET = "CanFM = Int(Right(" & RulesTable & ".CanFM,3))"
-                adjWHERE = "IIf([" & RulesTable & "]![" & FuelName & "]='9999',9999,Int(Right([" & RulesTable & "]![" & FuelName & "],3)))"
+            'Value assigned to the MU column, and the guard that skips default-valued rules
+            Dim valueExpr As String
+            Dim guardExpr As String
+            If FuelName = "FBFM40" OrElse FuelName = "CanFM" Then
+                'Access Right(x,3) -> substr(x,-3); Int() -> CAST AS INTEGER
+                valueExpr = "CAST(substr(R." & FuelName & ", -3) AS INTEGER)"
+                guardExpr = "CASE WHEN R." & FuelName & " = '" & defVal & "' THEN " & defVal &
+                            " ELSE CAST(substr(R." & FuelName & ", -3) AS INTEGER) END <> " & defVal
             Else
-                adjSET = FuelName & " = " & RulesTable & "." & FuelName
-                adjWHERE = "[" & RulesTable & "]![" & FuelName & "]"
+                valueExpr = "R." & FuelName
+                guardExpr = "R." & FuelName & " <> " & defVal
             End If
 
-            'Update all cmbrf table variables with Rules and where BPS and Wildcard are equal to "any"
-            strSQL = "UPDATE " & MUTable & " " &
-                     "INNER JOIN " & RulesTable & " ON " & MUTable & ".DIST = " & RulesTable & ".DIST " &
-                     "AND " & MUTable & ".EVTR = " & RulesTable & ".EVT " &
-                     "SET " & MUTable & ".New" & adjSET & " " &
-                     "WHERE (([" & RulesTable & "]![OnOff]='On') AND " &
-                            "(" & adjWHERE & "<>9999) And " &
-                            "([" & MUTable & "]![EVCR] Between Int([" & RulesTable & "]![Cover_Low]) And Int([" & RulesTable & "]![Cover_High])) And " &
-                            "([" & MUTable & "]![EVHR] Between Int([" & RulesTable & "]![Height_Low]) And Int([" & RulesTable & "]![Height_High])) AND " &
-                            "([" & RulesTable & "]![BPSRF]='any') AND " &
-                            "([" & RulesTable & "]![Wildcard]='any'))"
-            dbconn.Execute(strSQL)                                            'Run the SQL statement
+            Using conn As New SQLiteConnection(connString)
+                conn.Open()
 
-            'Update all cmbrf table variables with Rules and where BPS has a specific selection and Wildcard is "any"
-            'to trump previous BPS and Wildcard "any"
-            strSQL = "UPDATE " & MUTable & " " &
-                     "INNER JOIN " & RulesTable & " ON " & MUTable & ".DIST = " & RulesTable & ".DIST " &
-                     "AND " & MUTable & ".EVTR = " & RulesTable & ".EVT " &
-                     "SET " & MUTable & ".New" & adjSET & " " &
-                     "WHERE (([" & RulesTable & "]![OnOff]='On') AND " &
-                     "(" & adjWHERE & "<>9999) And " &
-                     "([" & MUTable & "]![EVCR] Between Int([" & RulesTable & "]![Cover_Low]) And Int([" & RulesTable & "]![Cover_High])) AND " &
-                     "([" & MUTable & "]![EVHR] Between Int([" & RulesTable & "]![Height_Low]) And Int([" & RulesTable & "]![Height_High])) AND " &
-                     "([" & RulesTable & "]![Wildcard]='any') AND " &
-                     "([" & MUTable & "]![BPSRF] & """" =[" & RulesTable & "]![BPSRF]))"
-            dbconn.Execute(strSQL)                                          'Run the SQL statement
+                'All four tiers must succeed or none of them — later tiers trump earlier ones
+                Using tx As SQLiteTransaction = conn.BeginTransaction()
 
-            'Update all cmbrf table variables with Rules and where Wildcard has a specific selection and BPS is "any"
-            'to trump previous BPS and Wildcard "any" and BPS specific selection and wildcard "any"
-            strSQL = "UPDATE " & MUTable & " " &
-                     "INNER JOIN " & RulesTable & " ON " & MUTable & ".DIST = " & RulesTable & ".DIST " &
-                     "AND " & MUTable & ".EVTR = " & RulesTable & ".EVT " &
-                     "SET " & MUTable & ".New" & adjSET & " " &
-                     "WHERE (([" & RulesTable & "]![OnOff]='On') AND " &
-                            "(" & adjWHERE & "<>9999) And " &
-                            "([" & MUTable & "]![EVCR] Between Int([" & RulesTable & "]![Cover_Low]) And Int([" & RulesTable & "]![Cover_High])) AND " &
-                            "([" & MUTable & "]![EVHR] Between Int([" & RulesTable & "]![Height_Low]) And Int([" & RulesTable & "]![Height_High])) AND " &
-                            "([" & MUTable & "]![Wildcard]=[" & RulesTable & "]![Wildcard]) AND " &
-                            "([" & RulesTable & "]![BPSRF]='any'))"
-            dbconn.Execute(strSQL)                                          'Run the SQL statement
+                    'Reset selected fuel in cmbrf table variable to the default
+                    ExecuteUpdate(conn, tx,
+                        "UPDATE " & MUTable & " SET New" & FuelName & " = " & defVal)
 
-            'Update all cmbrf table variables with Rules and where BPS and Wildcard have specific selections to trump previous
-            'BPS and Wildcard "any"
-            strSQL = "UPDATE " & MUTable & " " &
-                     "INNER JOIN " & RulesTable & " ON " & MUTable & ".DIST = " & RulesTable & ".DIST " &
-                     "AND " & MUTable & ".EVTR = " & RulesTable & ".EVT " &
-                     "SET " & MUTable & ".New" & adjSET & " " &
-                     "WHERE (([" & RulesTable & "]![OnOff]='On') AND " &
-                            "(" & adjWHERE & "<>9999) And " &
-                            "([" & MUTable & "]![EVCR] Between Int([" & RulesTable & "]![Cover_Low]) And Int([" & RulesTable & "]![Cover_High])) AND " &
-                            "([" & MUTable & "]![EVHR] Between Int([" & RulesTable & "]![Height_Low]) And Int([" & RulesTable & "]![Height_High])) AND " &
-                            "([" & MUTable & "]![Wildcard]=[" & RulesTable & "]![Wildcard]) AND " &
-                            "([" & MUTable & "]![BPSRF] & """" =[" & RulesTable & "]![BPSRF]))"
-            dbconn.Execute(strSQL)                                          'Run the SQL statement
+                    'BPS and Wildcard are both "any"
+                    ExecuteUpdate(conn, tx,
+                        BuildTierSql(MUTable, RulesTable, FuelName, valueExpr, guardExpr,
+                                     "R.BPSRF = 'any' AND R.Wildcard = 'any'"))
 
-            'Set Canopy Fuel to obey Canopy Guide when assigning rule based canopy fuel
-            If FuelName = "CCover" Or FuelName = "CHeight" Or FuelName = "CBH13mx10" Or
-               FuelName = "CBH40mx10" Or FuelName = "CBD13x100" Or FuelName = "CBD40x100" Then
+                    'BPS has a specific selection and Wildcard is "any" — trumps the previous tier
+                    ExecuteUpdate(conn, tx,
+                        BuildTierSql(MUTable, RulesTable, FuelName, valueExpr, guardExpr,
+                                     "R.Wildcard = 'any' AND CAST(M.BPSRF AS TEXT) = R.BPSRF"))
 
-                strSQL = "UPDATE " & MUTable & " " &                         'CG=0 No canopy fuel
-                         "SET New" & FuelName & " = 0 " &
-                         "WHERE (NewCanopy=0) AND " &
-                            "(New" & FuelName & "<>9999)"
-                dbconn.Execute(strSQL)                                      'Run the SQL statement
-            End If
-            If FuelName = "CBH13mx10" Or FuelName = "CBH40mx10" Then
-                strSQL = "UPDATE " & MUTable & " " &                         'CG=2 CBD set low and CBH set high
-                         "SET New" & FuelName & " = 100 " &
-                         "WHERE (NewCanopy=2) AND " &
-                            "(New" & FuelName & "<>9999)"
-                dbconn.Execute(strSQL)                                      'Run the SQL statement
-            End If
-            If FuelName = "CBD13x100" Or FuelName = "CBD40x100" Then
-                strSQL = "UPDATE " & MUTable & " " &                         'CG=2 CBD set low and CBH set high
-                         "SET New" & FuelName & " = 1 " &
-                         "WHERE (NewCanopy=2) AND " &
-                            "(New" & FuelName & "<>9999)"
-                dbconn.Execute(strSQL)                                      'Run the SQL statement
-            End If
-            If FuelName = "CBD13x100" Or FuelName = "CBD40x100" Then
-                strSQL = "UPDATE " & MUTable & " " &                         'CG=3 CBD set low 4/25/2019
-                         "SET New" & FuelName & " = 5 " &
-                         "WHERE (NewCanopy=3) AND " &
-                            "(New" & FuelName & "<>9999)"
-                dbconn.Execute(strSQL)                                      'Run the SQL statement
-            End If
+                    'Wildcard has a specific selection and BPS is "any" — trumps both previous tiers
+                    ExecuteUpdate(conn, tx,
+                        BuildTierSql(MUTable, RulesTable, FuelName, valueExpr, guardExpr,
+                                     "M.WILDCARD = R.Wildcard AND R.BPSRF = 'any'"))
 
-            If dbconn.State <> System.Data.ConnectionState.Closed Then                     'Database needs to be closed
-                dbconn = Nothing
-            End If
+                    'BPS and Wildcard both have specific selections — trumps everything above
+                    ExecuteUpdate(conn, tx,
+                        BuildTierSql(MUTable, RulesTable, FuelName, valueExpr, guardExpr,
+                                     "M.WILDCARD = R.Wildcard AND CAST(M.BPSRF AS TEXT) = R.BPSRF"))
+
+                    'Set Canopy Fuel to obey Canopy Guide when assigning rule based canopy fuel
+                    If FuelName = "CCover" Or FuelName = "CHeight" Or FuelName = "CBH13mx10" Or
+                       FuelName = "CBH40mx10" Or FuelName = "CBD13x100" Or FuelName = "CBD40x100" Then
+                        'CG=0 No canopy fuel
+                        ExecuteUpdate(conn, tx, BuildCanopyGuideSql(MUTable, FuelName, 0, 0, defVal))
+                    End If
+                    If FuelName = "CBH13mx10" Or FuelName = "CBH40mx10" Then
+                        'CG=2 CBD set low and CBH set high
+                        ExecuteUpdate(conn, tx, BuildCanopyGuideSql(MUTable, FuelName, 2, 100, defVal))
+                    End If
+                    If FuelName = "CBD13x100" Or FuelName = "CBD40x100" Then
+                        'CG=2 CBD set low and CBH set high
+                        ExecuteUpdate(conn, tx, BuildCanopyGuideSql(MUTable, FuelName, 2, 1, defVal))
+                    End If
+                    If FuelName = "CBD13x100" Or FuelName = "CBD40x100" Then
+                        'CG=3 CBD set low 4/25/2019
+                        ExecuteUpdate(conn, tx, BuildCanopyGuideSql(MUTable, FuelName, 3, 5, defVal))
+                    End If
+
+                    tx.Commit()
+                End Using
+            End Using
         Catch ex As Exception
-            If dbconn.State <> System.Data.ConnectionState.Closed Then                     'Database needs to be closed
-                dbconn = Nothing
-            End If
-
             MsgBox("Error in AssignValues - " & ex.Message)
         End Try
     End Sub
+    Private Sub ExecuteUpdate(conn As SQLiteConnection, tx As SQLiteTransaction, sql As String)
+        strSQL = sql
+        Using cmd As New SQLiteCommand(sql, conn, tx)
+            cmd.ExecuteNonQuery()
+        End Using
+    End Sub
 
-    Private Sub Assign9999(ByVal FuelName As String, ByVal MUName As String)
-        Dim dbconn As New ADODB.Connection                                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection & strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+    Private Function BuildTierSql(MUTable As String, RulesTable As String, FuelName As String,
+                                  valueExpr As String, guardExpr As String,
+                                  tierCondition As String) As String
+        Dim match As String =
+            "FROM " & RulesTable & " R " &
+            "WHERE M.DIST = R.DIST " &
+            "AND M.EVTR = R.EVT " &
+            "AND R.OnOff = 'On' " &
+            "AND " & guardExpr & " " &
+            "AND M.EVCR BETWEEN CAST(R.Cover_Low AS INTEGER) AND CAST(R.Cover_High AS INTEGER) " &
+            "AND M.EVHR BETWEEN CAST(R.Height_Low AS INTEGER) AND CAST(R.Height_High AS INTEGER) " &
+            "AND " & tierCondition
+
+        Return "UPDATE " & MUTable & " AS M " &
+               "SET New" & FuelName & " = (SELECT " & valueExpr & " " & match & " LIMIT 1) " &
+               "WHERE EXISTS (SELECT 1 " & match & ")"
+    End Function
+
+    Private Function BuildCanopyGuideSql(MUTable As String, FuelName As String,
+                                         canopyGuide As Integer, setValue As Integer,
+                                         defVal As String) As String
+        Return "UPDATE " & MUTable & " " &
+               "SET New" & FuelName & " = " & setValue & " " &
+               "WHERE NewCanopy = " & canopyGuide & " " &
+               "AND New" & FuelName & " <> " & defVal
+    End Function
+
+    Private Sub Assign9999(FuelName As String, MUName As String)
+
+        Dim dbPath As String = System.IO.Path.Combine(strProjectPath, gs_LFTFCSQliteName)
+        Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
+
+        Dim MUTable As String = MUName & "_CMB"
+        Dim fieldName As String = "New" & FuelName
+
+        Dim sql As String =
+        "UPDATE " & MUTable & " " &
+        "SET " & fieldName & " = @defaultFuel"
 
         Try
-            Dim MUTable = MUName + "_CMB"
-            strSQL = "UPDATE " & MUTable & " SET " & MUTable & ".New" & FuelName & " = 9999"
+            Using conn As New SQLiteConnection(connString)
+                conn.Open()
 
-            dbconn.Execute(strSQL)                                                      'Run the SQL statement
+                Using cmd As New SQLiteCommand(sql, conn)
+                    cmd.Parameters.AddWithValue("@defaultFuel", DEFAULT_FUEL_VAL)
+                    cmd.ExecuteNonQuery()
+                End Using
+            End Using
 
-            If dbconn.State <> System.Data.ConnectionState.Closed Then                                 'Database needs to be closed
-                dbconn = Nothing
-            End If
         Catch ex As Exception
-            If dbconn.State <> System.Data.ConnectionState.Closed Then                                 'Database needs to be closed
-                dbconn = Nothing
-            End If
-
             MsgBox("Error in Assign9999 - " & ex.Message)
         End Try
+
     End Sub
 
     Private Sub CalcCCandCH(ByVal MUName As String, ByVal CCMult As Double, ByVal CHMult As Double)
         Refresh()
 
-        Const lowHeight As Integer = 18                                                     'Stores the lowValue for midpoint assignment 1.8m or 6ft
+        Const lowHeight As Integer = 18     'Stores the lowValue for midpoint assignment 1.8m or 6ft
 
-        Dim rs1 As New ADODB.Recordset                                                      'recordset for data
-        Dim dbconn As New ADODB.Connection                                                  'DB connection
-
-        dbconn.ConnectionString = gs_DBConnection & strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+        Dim dbPath As String = strProjectPath & "\" & gs_LFTFCSQliteName
+        Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
 
         Try
-            Dim MUTable = MUName + "_CMB"
-            'Calculate CC and CH before calculating GLM
+            Dim MUTable As String = MUName + "_CMB"
+            Dim defVal As String = DEFAULT_FUEL_VAL.ToString()
+            Dim canopySet As String = "M.NewCanopy IN (1, 2, 3)"
 
-            If chkCCEquation.Checked = False Then                                                         'Update NewCCover to Midpoint
-                cmdCreateGRID.Text = "CC mid_pt"
-                Refresh()
+            Using conn As New SQLiteConnection(connString)
+                conn.Open()
 
-                strSQL = "UPDATE " & MUTable & " INNER JOIN LUT_Cover " &
-                                     "ON " & MUTable & ".EVCR = LUT_Cover.EVC SET " & MUTable & ".NewCCover = [LUT_Cover].[MidPoint] * " & CCMult & " " &
-                                     "WHERE (((" & MUTable & ".NewCanopy = 1) Or (" & MUTable & ".NewCanopy = 2) " &
-                                     "Or (" & MUTable & ".NewCanopy = 3)) And NewCCover = 9999)"
-                dbconn.Execute(strSQL)
-            Else                                                                            'Update NewCCover with equations
-                cmdCreateGRID.Text = "CC Eqs"
-                Refresh()
+                'Read the tree height midpoints up front — no reader can be open while updates run
+                Dim treeBands As List(Of HeightBand) = LoadTreeHeightBands(conn)
 
-                'Get Disturbed NewCCover
-                strSQL = "UPDATE ((" & MUTable & " INNER JOIN Master_Disturbance_Tbl On " &
-                                         "(" & MUTable & ".DIST = Master_Disturbance_Tbl.HDist) And " &
-                                         "(" & MUTable & ".EVTR = Master_Disturbance_Tbl.Tree_EVTs)) " &
-                                         "INNER JOIN LUT_Cover On " & MUTable & ".EVCR = LUT_Cover.EVC) " &
-                                         "INNER JOIN LUT_Height On " & MUTable & ".EVHR = LUT_Height.EVH " &
-                                         "Set " & MUTable & ".NewCCover = " &
-                                         "IIf(Round((([Master_Disturbance_Tbl]![intercept]) + ([Master_Disturbance_Tbl]![HT_coef] * [LUT_Height]![MidPoint]) + ([Master_Disturbance_Tbl]![CC_coef] * [LUT_Cover]![MidPoint])) * " & CCMult & ",0) < 0, 0, " &
-                                         "IIf(Round((([Master_Disturbance_Tbl]![intercept]) + ([Master_Disturbance_Tbl]![HT_coef] * [LUT_Height]![MidPoint]) + ([Master_Disturbance_Tbl]![CC_coef] * [LUT_Cover]![MidPoint])) * " & CCMult & ",0) >= 95, 95, " &
-                                         "Round((([Master_Disturbance_Tbl]![intercept]) + ([Master_Disturbance_Tbl]![HT_coef] * [LUT_Height]![MidPoint]) + ([Master_Disturbance_Tbl]![CC_coef] * [LUT_Cover]![MidPoint])) * " & CCMult & ",0))) " &
-                                         "WHERE ((" & MUTable & ".DIST > 0) And (Master_Disturbance_Tbl.EVT_Fill <> 9999) And " &
-                                         "(Master_Disturbance_Tbl.EV_Structure = 'Cover') AND (NewCCover = 9999) AND " &
-                                         "((" & MUTable & ".NewCanopy = 1) Or (" & MUTable & ".NewCanopy = 2) Or (" & MUTable & ".NewCanopy = 3)))"
-                dbconn.Execute(strSQL)
-            End If
+                Using tx As SQLiteTransaction = conn.BeginTransaction()
 
-            If chkCHEquation.Checked = False Then                                                         'Update NewCHeight to Midpoint
-                cmdCreateGRID.Text = "CH mid_pt"
-                Refresh()
-                strSQL = "UPDATE " & MUTable & " INNER JOIN LUT_Height " &
-                                     "ON " & MUTable & ".EVHR = LUT_Height.EVH SET " & MUTable & ".NewCHeight = [LUT_Height].[MidPoint] * " & CHMult & " * 10 " &
-                                     "WHERE (((" & MUTable & ".NewCanopy = 1) Or (" & MUTable & ".NewCanopy = 2) " &
-                                     "Or (" & MUTable & ".NewCanopy = 3)) And NewCHeight = 9999)"
-                dbconn.Execute(strSQL)
-            Else                                                                            'Update NewCHeight with equations
-                cmdCreateGRID.Text = "CH Eqs"
-                Refresh()
-                'Get Disturbed NewCHeight
-                strSQL = "UPDATE ((" & MUTable & " INNER JOIN Master_Disturbance_Tbl ON " &
-                                         "(" & MUTable & ".DIST = Master_Disturbance_Tbl.HDist) And " &
-                                         "(" & MUTable & ".EVTR = Master_Disturbance_Tbl.Tree_EVTs)) " &
-                                         "INNER JOIN LUT_Cover ON " & MUTable & ".EVCR = LUT_Cover.EVC) " &
-                                         "INNER JOIN LUT_Height ON " & MUTable & ".EVHR = LUT_Height.EVH " &
-                                         "SET " & MUTable & ".NewCHeight = " &
-                                         "IIf((([Master_Disturbance_Tbl]![intercept]) + ([Master_Disturbance_Tbl]![HT_coef] * [LUT_Height]![MidPoint]) + ([Master_Disturbance_Tbl]![CC_coef] * [LUT_Cover]![MidPoint])) * " & CHMult & " < 0, 0, " &
-                                         "IIf((([Master_Disturbance_Tbl]![intercept]) + ([Master_Disturbance_Tbl]![HT_coef] * [LUT_Height]![MidPoint]) + ([Master_Disturbance_Tbl]![CC_coef] * [LUT_Cover]![MidPoint])) * " & CHMult & " >= 50, 500, " &
-                                         "Round((([Master_Disturbance_Tbl]![intercept]) + ([Master_Disturbance_Tbl]![HT_coef] * [LUT_Height]![MidPoint]) + ([Master_Disturbance_Tbl]![CC_coef] * [LUT_Cover]![MidPoint])) * " & CHMult & " * 10,0))) " &
-                                         "WHERE (((" & MUTable & ".DIST)>0) And ((Master_Disturbance_Tbl.EVT_Fill)<>9999) And " &
-                                         "((Master_Disturbance_Tbl.EV_Structure)='Height') AND " &
-                                         "((" & MUTable & ".NewCanopy) = 1 Or (" & MUTable & ".NewCanopy = 2) Or (" & MUTable & ".NewCanopy = 3)))"
-                dbconn.Execute(strSQL)
-            End If
+                    'Calculate CC and CH before calculating GLM
+                    If chkCCEquation.Checked = False Then        'Update NewCCover to Midpoint
+                        cmdCreateGRID.Text = "CC mid_pt"
+                        Refresh()
 
-            'Bin disturbed NewCCover to 15,25,35,45,55,65,75,85,95 % If CC<10% goes to 0% CC OR If CH <= lowHeight variable CC goes to 0
-            strSQL = "UPDATE " & MUTable & " SET " & MUTable & ".NewCCover = " &
-                     "IIf(([" & MUTable & "]![NewCCover] < 10) Or ([" & MUTable & "]![NewCHeight] <= " & lowHeight & "), 0, Int([" & MUTable & "]![NewCCover]/10)*10+5) " &
-                     "WHERE ((" & MUTable & ".NewCCover <> 9999) AND (" & MUTable & ".NewCHeight <> 9999))"
-            dbconn.Execute(strSQL)
+                        ExecuteUpdate(conn, tx, BuildLutJoinUpdate(
+                            MUTable, "NewCCover", "LUT_Cover", "EVCR", "EVC",
+                            "L.MidPoint * " & Dbl(CCMult),
+                            canopySet & " AND M.NewCCover = " & defVal))
+                    Else                                        'Update NewCCover with equations
+                        cmdCreateGRID.Text = "CC Eqs"
+                        Refresh()
 
-            'Bin NewCHeight in Mx10 and if CC is 0 CH gets 0
-            strSQL = "UPDATE " & MUTable & " SET " & MUTable & ".NewCHeight = " &
-                     "IIf(([" & MUTable & "]![NewCCover] = 0), 0, [" & MUTable & "]![NewCHeight]) " &
-                     "WHERE ((" & MUTable & ".NewCCover <> 9999) AND (" & MUTable & ".NewCHeight <> 9999))"
-            dbconn.Execute(strSQL)
+                        'Get Disturbed NewCCover
+                        Dim eq As String = DisturbanceEquation(CCMult)
+                        ExecuteUpdate(conn, tx, BuildDisturbanceUpdate(
+                            MUTable, "NewCCover",
+                            "CASE WHEN ROUND(" & eq & ") < 0 THEN 0 " &
+                            "WHEN ROUND(" & eq & ") >= 95 THEN 95 " &
+                            "ELSE ROUND(" & eq & ") END",
+                            "Cover", defVal, canopySet & " AND M.NewCCover = " & defVal))
+                    End If
 
-            'Get midpoint values of tree heights
-            strSQL = "SELECT LUT_Height.Lifeform, LUT_Height.MidPoint, LUT_Height.[Lower], LUT_Height.[Upper] " &
-                     "FROM LUT_Height " &
-                     "WHERE LUT_Height.Lifeform ='Tree'"
-            rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                    If chkCHEquation.Checked = False Then        'Update NewCHeight to Midpoint
+                        cmdCreateGRID.Text = "CH mid_pt"
+                        Refresh()
 
-            'Assign midpoints
-            Do Until rs1.EOF
-                strSQL = "UPDATE " & MUTable & " SET " & MUTable & ".NewCHeight = " &
-                         "IIf(([" & MUTable & "]![NewCHeight] >= " & rs1.Fields!Lower.Value * 10 & ") " &
-                         "AND ([" & MUTable & "]![NewCHeight] < " & rs1.Fields!Upper.Value * 10 & "), " &
-                         rs1.Fields!MidPoint.Value * 10 & ", " &
-                         "[" & MUTable & "]![NewCHeight]) " &
-                         "WHERE ((" & MUTable & ".NewCCover <> 9999) AND (" & MUTable & ".NewCHeight <> 9999))"
-                dbconn.Execute(strSQL)
-                rs1.MoveNext()
-            Loop
+                        ExecuteUpdate(conn, tx, BuildLutJoinUpdate(
+                            MUTable, "NewCHeight", "LUT_Height", "EVHR", "EVH",
+                            "L.MidPoint * " & Dbl(CHMult) & " * 10",
+                            canopySet & " AND M.NewCHeight = " & defVal))
+                    Else                                        'Update NewCHeight with equations
+                        cmdCreateGRID.Text = "CH Eqs"
+                        Refresh()
 
-            'Assign non disturbed CC
-            strSQL = "UPDATE " & MUTable & " INNER JOIN LUT_Cover " &
-                                 "ON " & MUTable & ".EVCR = LUT_Cover.EVC SET " & MUTable & ".NewCCover = [LUT_Cover].[MidPoint] * " & CCMult & " " &
-                                 "WHERE (((" & MUTable & ".NewCanopy = 1) " &
-                                 "Or (" & MUTable & ".NewCanopy = 2) " &
-                                 "Or (" & MUTable & ".NewCanopy = 3)) " &
-                                 "And (" & MUTable & ".DIST = 0) And (NewCCover = 9999))"
-            dbconn.Execute(strSQL)
+                        'Get Disturbed NewCHeight
+                        Dim eq As String = DisturbanceEquation(CHMult)
+                        ExecuteUpdate(conn, tx, BuildDisturbanceUpdate(
+                            MUTable, "NewCHeight",
+                            "CASE WHEN " & eq & " < 0 THEN 0 " &
+                            "WHEN " & eq & " >= 50 THEN 500 " &
+                            "ELSE ROUND((" & eq & ") * 10) END",
+                            "Height", defVal, canopySet))
+                    End If
 
-            'Assign non disturbed CH
-            strSQL = "UPDATE " & MUTable & " INNER JOIN LUT_Height " &
-                                 "ON " & MUTable & ".EVHR = LUT_Height.EVH SET " & MUTable & ".NewCHeight = [LUT_Height].[MidPoint] * " & CHMult & " * 10 " &
-                                 "WHERE (((" & MUTable & ".NewCanopy = 1) " &
-                                 "Or (" & MUTable & ".NewCanopy = 2) " &
-                                 "Or (" & MUTable & ".NewCanopy = 3)) " &
-                                 "And (" & MUTable & ".DIST = 0) And (NewCHeight = 9999))"
-            dbconn.Execute(strSQL)
+                    'Bin disturbed NewCCover to 15,25,35,45,55,65,75,85,95 % If CC<10% goes to 0% CC OR If CH <= lowHeight variable CC goes to 0
+                    ExecuteUpdate(conn, tx,
+                        "UPDATE " & MUTable & " SET NewCCover = " &
+                        "CASE WHEN NewCCover < 10 OR NewCHeight <= " & lowHeight & " THEN 0 " &
+                        "ELSE CAST(NewCCover / 10 AS INTEGER) * 10 + 5 END " &
+                        "WHERE NewCCover <> " & defVal & " AND NewCHeight <> " & defVal)
 
-            Refresh()
+                    'Bin NewCHeight in Mx10 and if CC is 0 CH gets 0
+                    ExecuteUpdate(conn, tx,
+                        "UPDATE " & MUTable & " SET NewCHeight = " &
+                        "CASE WHEN NewCCover = 0 THEN 0 ELSE NewCHeight END " &
+                        "WHERE NewCCover <> " & defVal & " AND NewCHeight <> " & defVal)
 
-            'Update combo table for everywhere that Canopy = 0
-            strSQL = "Update " & MUTable & " " &
-                 "SET NewCCover = NewCanopy, NewCHeight = NewCanopy " &
-                 "WHERE (NewCanopy = 0) Or (NewCanopy = 9999)"
-            dbconn.Execute(strSQL)                                                      'Run the SQL statement
+                    'Assign midpoints
+                    Using cmd As New SQLiteCommand(
+                        "UPDATE " & MUTable & " SET NewCHeight = " &
+                        "CASE WHEN NewCHeight >= @lower AND NewCHeight < @upper " &
+                        "THEN @mid ELSE NewCHeight END " &
+                        "WHERE NewCCover <> " & defVal & " AND NewCHeight <> " & defVal, conn, tx)
 
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
+                        cmd.Parameters.Add("@lower", DbType.Double)
+                        cmd.Parameters.Add("@upper", DbType.Double)
+                        cmd.Parameters.Add("@mid", DbType.Double)
 
-            If dbconn.State <> System.Data.ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
+                        For Each b As HeightBand In treeBands
+                            cmd.Parameters("@lower").Value = b.Lower * 10
+                            cmd.Parameters("@upper").Value = b.Upper * 10
+                            cmd.Parameters("@mid").Value = b.MidPoint * 10
+                            cmd.ExecuteNonQuery()
+                        Next
+                    End Using
 
+                    'Assign non disturbed CC
+                    ExecuteUpdate(conn, tx, BuildLutJoinUpdate(
+                        MUTable, "NewCCover", "LUT_Cover", "EVCR", "EVC",
+                        "L.MidPoint * " & Dbl(CCMult),
+                        canopySet & " AND M.DIST = 0 AND M.NewCCover = " & defVal))
+
+                    'Assign non disturbed CH
+                    ExecuteUpdate(conn, tx, BuildLutJoinUpdate(
+                        MUTable, "NewCHeight", "LUT_Height", "EVHR", "EVH",
+                        "L.MidPoint * " & Dbl(CHMult) & " * 10",
+                        canopySet & " AND M.DIST = 0 AND M.NewCHeight = " & defVal))
+
+                    Refresh()
+
+                    'Update combo table for everywhere that Canopy = 0
+                    ExecuteUpdate(conn, tx,
+                        "UPDATE " & MUTable & " " &
+                        "SET NewCCover = NewCanopy, NewCHeight = NewCanopy " &
+                        "WHERE NewCanopy = 0 OR NewCanopy = " & defVal)
+
+                    tx.Commit()
+                End Using
+            End Using
         Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-
-            If dbconn.State <> System.Data.ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-
             MsgBox("Error in CalcCCandCH- " & ex.Message)
         End Try
     End Sub
 
-    Private Sub CBH_LM_EQs(ByVal FuelName As String, CBHMult As Double, ByVal MUName As String)
-        Dim dbconn As New ADODB.Connection                                                  'DB connection
+    Private Structure HeightBand
+        Public MidPoint As Double
+        Public Lower As Double
+        Public Upper As Double
+    End Structure
 
-        dbconn.ConnectionString = gs_DBConnection & strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+    'Forces invariant formatting so a comma decimal separator can't corrupt the SQL
+    Private Function Dbl(value As Double) As String
+        Return value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+    End Function
+
+    'The regression shared by the CC and CH equation branches
+    Private Function DisturbanceEquation(mult As Double) As String
+        Return "(D.intercept + (D.HT_coef * H.MidPoint) + (D.CC_coef * C.MidPoint)) * " & Dbl(mult)
+    End Function
+
+    'Access UPDATE...INNER JOIN <lookup> has no SQLite equivalent
+    Private Function BuildLutJoinUpdate(MUTable As String, targetCol As String,
+                                        lutTable As String, muKey As String, lutKey As String,
+                                        valueExpr As String, extraWhere As String) As String
+        Dim match As String = "FROM " & lutTable & " L WHERE L." & lutKey & " = M." & muKey
+
+        Return "UPDATE " & MUTable & " AS M " &
+               "SET " & targetCol & " = (SELECT " & valueExpr & " " & match & " LIMIT 1) " &
+               "WHERE EXISTS (SELECT 1 " & match & ") AND " & extraWhere
+    End Function
+
+    'The three-way join used by both equation branches
+    Private Function BuildDisturbanceUpdate(MUTable As String, targetCol As String,
+                                            valueExpr As String, evStructure As String,
+                                            defVal As String, extraWhere As String) As String
+        Dim match As String =
+            "FROM Master_Disturbance_Tbl D " &
+            "INNER JOIN LUT_Cover C ON C.EVC = M.EVCR " &
+            "INNER JOIN LUT_Height H ON H.EVH = M.EVHR " &
+            "WHERE D.HDist = M.DIST AND D.Tree_EVTs = M.EVTR " &
+            "AND D.EVT_Fill <> " & defVal & " " &
+            "AND D.EV_Structure = '" & evStructure & "'"
+
+        Return "UPDATE " & MUTable & " AS M " &
+               "SET " & targetCol & " = (SELECT " & valueExpr & " " & match & " LIMIT 1) " &
+               "WHERE EXISTS (SELECT 1 " & match & ") " &
+               "AND M.DIST > 0 AND " & extraWhere
+    End Function
+
+    Private Function LoadTreeHeightBands(conn As SQLiteConnection) As List(Of HeightBand)
+        Dim bands As New List(Of HeightBand)
+
+        'Get midpoint values of tree heights
+        Dim sql As String =
+            "SELECT MidPoint, ""Lower"", ""Upper"" " &
+            "FROM LUT_Height " &
+            "WHERE Lifeform = 'Tree'"
+
+        strSQL = sql
+        Using cmd As New SQLiteCommand(sql, conn)
+            Using reader As SQLiteDataReader = cmd.ExecuteReader()
+                While reader.Read()
+                    Dim b As New HeightBand
+                    b.MidPoint = CDbl(reader("MidPoint"))
+                    b.Lower = CDbl(reader("Lower"))
+                    b.Upper = CDbl(reader("Upper"))
+                    bands.Add(b)
+                End While
+            End Using
+        End Using
+
+        Return bands
+    End Function
+
+    Private Sub CBH_LM_EQs(ByVal FuelName As String, CBHMult As Double, ByVal MUName As String)
+        Dim dbPath As String = strProjectPath & "\" & gs_LFTFCSQliteName
+        Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
 
         Try
-            Dim MUTable = MUName + "_CMB"
+            Dim MUTable As String = MUName + "_CMB"
+            Dim defVal As String = DEFAULT_FUEL_VAL.ToString()
+
             cmdCreateGRID.Text = "CBH EQs"
             Refresh()
 
-            'Update combo table with CBH EQs
-            strSQL = "UPDATE (" & MUTable & " INNER JOIN Master_Disturbance_Tbl ON " &
-                            "(" & MUTable & ".DIST = Master_Disturbance_Tbl.HDist) And " &
-                            "(" & MUTable & ".EVTR = Master_Disturbance_Tbl.Tree_EVTs)) " &
-                            "SET " & MUTable & ".New" & FuelName & " = " &
-                            "IIf((([Master_Disturbance_Tbl]![intercept]) + ([Master_Disturbance_Tbl]![HT_coef] * ([" & MUTable & "].[NewCHeight]/10)) + ([Master_Disturbance_Tbl]![CC_coef] * [" & MUTable & "].[NewCCover])) * " & CBHMult & " < 0.3, 3, " &
-                            "IIf((([Master_Disturbance_Tbl]![intercept]) + ([Master_Disturbance_Tbl]![HT_coef] * ([" & MUTable & "].[NewCHeight]/10)) + ([Master_Disturbance_Tbl]![CC_coef] * [" & MUTable & "].[NewCCover])) * " & CBHMult & " >= 10, 100, " &
-                            "Round((([Master_Disturbance_Tbl]![intercept]) + ([Master_Disturbance_Tbl]![HT_coef] * ([" & MUTable & "].[NewCHeight]/10)) + ([Master_Disturbance_Tbl]![CC_coef] * [" & MUTable & "].[NewCCover])) * " & CBHMult & " * 10,0))) " &
-                            "WHERE (((Master_Disturbance_Tbl.EVT_Fill) <> 9999) And ((" & MUTable & ".NewCCover) <> 9999) And " &
-                            "((Master_Disturbance_Tbl.EV_Structure) = 'CBH') AND ((New" & FuelName & ") = 9999) AND " &
-                            "(((" & MUTable & ".NewCanopy) = 1) Or ((" & MUTable & ".NewCanopy) = 3)))"
-            dbconn.Execute(strSQL)
+            'The regression, evaluated against the MU row's current CH and CC
+            Dim eq As String = "(D.intercept + (D.HT_coef * (M.NewCHeight / 10.0)) + " &
+                               "(D.CC_coef * M.NewCCover)) * " & Dbl(CBHMult)
 
-            'Update combo table for everywhere that Canopy = 2 or CBH > 100
-            strSQL = "Update " & MUTable & " " &
-                 "SET New" & FuelName & " = 100 " &
-                 "WHERE (NewCanopy = 2) Or (New" & FuelName & " > 100 And New" & FuelName & " <> 9999)"
-            dbconn.Execute(strSQL)                                             'Run the SQL statement
+            Dim match As String =
+                "FROM Master_Disturbance_Tbl D " &
+                "WHERE D.HDist = M.DIST AND D.Tree_EVTs = M.EVTR " &
+                "AND D.EVT_Fill <> " & defVal & " " &
+                "AND D.EV_Structure = 'CBH'"
 
-            'Update combo table for everywhere that Canopy = 0
-            strSQL = "Update " & MUTable & " " &
-                 "SET New" & FuelName & " = NewCanopy " &
-                 "WHERE (NewCanopy = 0) Or (NewCanopy = 9999)"
-            dbconn.Execute(strSQL)                                             'Run the SQL statement
+            Using conn As New SQLiteConnection(connString)
+                conn.Open()
 
-            'Update combo table for everywhere that NewCCover = 0
-            strSQL = "Update " & MUTable & " " &
-                 "SET New" & FuelName & " = NewCCover " &
-                 "WHERE NewCCover = 0"
-            dbconn.Execute(strSQL)                                             'Run the SQL statement
+                Using tx As SQLiteTransaction = conn.BeginTransaction()
 
-            'Update CBH = 2/3 the CH in combo table for everywhere that CBH > CH
-            'CBH13
-            strSQL = "Update " & MUTable & " " &
-                    "SET New" & FuelName & " = Int(" & MUTable & "![NewCHeight]/10*0.6666*10) " &
-                    "WHERE (((" & MUTable & ".New" & FuelName & ")<>9999 And " &
-                    "(" & MUTable & ".New" & FuelName & ")>=[" & MUTable & "]![NewCHeight]))"
-            dbconn.Execute(strSQL)                                             'Run the SQL statement
+                    'Update combo table with CBH EQs
+                    ExecuteUpdate(conn, tx,
+                        "UPDATE " & MUTable & " AS M " &
+                        "SET New" & FuelName & " = (SELECT " &
+                            "CASE WHEN " & eq & " < 0.3 THEN 3 " &
+                            "WHEN " & eq & " >= 10 THEN 100 " &
+                            "ELSE ROUND((" & eq & ") * 10) END " &
+                            match & " LIMIT 1) " &
+                        "WHERE EXISTS (SELECT 1 " & match & ") " &
+                        "AND M.NewCCover <> " & defVal & " " &
+                        "AND M.New" & FuelName & " = " & defVal & " " &
+                        "AND M.NewCanopy IN (1, 3)")
 
-            'CBH40
-            strSQL = "Update " & MUTable & " " &
-                   "SET New" & FuelName & " = Int(" & MUTable & "![NewCHeight]/10*0.6666*10) " &
-                   "WHERE (((" & MUTable & ".NewCBH40mx10)<>9999 And " &
-                   "(" & MUTable & ".NewCBH40mx10)>=[" & MUTable & "]![NewCHeight]))"
-            dbconn.Execute(strSQL)                                             'Run the SQL statement
+                    'Update combo table for everywhere that Canopy = 2 or CBH > 100
+                    ExecuteUpdate(conn, tx,
+                        "UPDATE " & MUTable & " " &
+                        "SET New" & FuelName & " = 100 " &
+                        "WHERE NewCanopy = 2 " &
+                        "OR (New" & FuelName & " > 100 AND New" & FuelName & " <> " & defVal & ")")
 
-            If dbconn.State <> System.Data.ConnectionState.Closed Then                                 'Database needs to be closed
-                dbconn = Nothing
-            End If
+                    'Update combo table for everywhere that Canopy = 0
+                    ExecuteUpdate(conn, tx,
+                        "UPDATE " & MUTable & " " &
+                        "SET New" & FuelName & " = NewCanopy " &
+                        "WHERE NewCanopy = 0 OR NewCanopy = " & defVal)
+
+                    'Update combo table for everywhere that NewCCover = 0
+                    ExecuteUpdate(conn, tx,
+                        "UPDATE " & MUTable & " " &
+                        "SET New" & FuelName & " = NewCCover " &
+                        "WHERE NewCCover = 0")
+
+                    'Update CBH = 2/3 the CH in combo table for everywhere that CBH > CH
+                    'CBH13 or CBH40
+                    ExecuteUpdate(conn, tx,
+                        "UPDATE " & MUTable & " " &
+                        "SET New" & FuelName & " = CAST(NewCHeight / 10.0 * 0.6666 * 10 AS INTEGER) " &
+                        "WHERE New" & FuelName & " <> " & defVal & " " &
+                        "AND New" & FuelName & " >= NewCHeight")
+
+                    tx.Commit()
+                End Using
+            End Using
         Catch ex As Exception
-            If dbconn.State <> System.Data.ConnectionState.Closed Then                                 'Database needs to be closed
-                dbconn = Nothing
-            End If
-
             MsgBox("Error in CBH_LM_EQs - " & ex.Message)
         End Try
     End Sub
+
+    Private Structure CbdGroup
+        Public EVTR As Long
+        Public NewCCover As Long
+        Public NewCHeight As Long
+        Public NewCanopy As Long
+    End Structure
+
+    'Shared by both passes. isPJ = False sets the PJ switch to 1 (not PJ/J),
+    'isPJ = True sets it to 0 — matching the original's lngPJ assignments.
+    Private Function ComputeCBD(lngCov As Long, dblHgt As Double, lngCan As Long,
+                                isPJ As Boolean, CBDMult As Double) As Double
+        Dim dblCBD As Double
+
+        If lngCov = 0 Then
+            dblCBD = 0 'If CC = 0 then CBD = 0
+        ElseIf lngCan = 2 Then
+            dblCBD = 1 'Canopy mask is 2 so CBD gets 0.012 or 1 in kg/m^*100
+        ElseIf lngCan = 3 Then
+            dblCBD = 5 'Canopy mask is 3 so CBD gets 0.05 or 5 in kg/m^*100
+        Else
+            'EXP(-2.4887057+(0.0335917*CC)+(-0.356861*SH1_)+(-0.6006381*SH2_)+(-1.10691*PJ)+(-0.0010804*CC*SH1_)+(-0.0018324*CC*SH2_))
+            'CBDpred = −2.489 + 0.034(CC)+−0.357(SH1)+−0.601(SH2)+−1.107(PJ)+−0.001(CC × SH1)+−0.002(CC × SH2)
+
+            '0 Means it is a PJ and or J EVT; 1 means none of these are pj or j
+            Dim lngPJ As Long = If(isPJ, 0L, 1L)
+            Dim lngSH1 As Long = 0
+            Dim lngSH2 As Long = 0
+
+            If dblHgt < 15 Then
+                lngSH1 = 0
+                lngSH2 = 0
+            ElseIf dblHgt < 30 Then
+                lngSH1 = 1
+                lngSH2 = 0
+            ElseIf dblHgt >= 30 Then
+                lngSH1 = 0
+                lngSH2 = 1
+            End If
+
+            dblCBD = -2.4887057 + (0.0335917 * lngCov) + (-0.356861 * lngSH1) + -(0.6006381 * lngSH2) +
+                    (-1.10691 * lngPJ) + (-0.0010804 * (lngCov * lngSH1)) + (-0.0018324 * (lngCov * lngSH2))
+            'The base natural logarithm raised to the dblCBD value multiply by 100 then integerize for kg/m^3 * 100
+            dblCBD = System.Math.Round(System.Math.Exp(dblCBD) * CBDMult, 2) * 100
+        End If
+
+        If dblCBD > 45 Then
+            dblCBD = 45
+        End If
+
+        Return dblCBD
+    End Function
+
 
     Private Sub CalcCBDGLM(ByVal FuelName As String, CBDMult As Double, ByVal MUName As String)
         cmdCreateGRID.Text = "CBD GLM"
         Refresh()
 
-        Dim lngEVT As Long                                              'Stores the EVT code value
-        Dim lngCan As Long                                              'Stores the Canopy Mask value
-        Dim dblCBD As Double                                            'Stores the CBD GLM predicted value
-        Dim dblHgt As Double                                            'Stores the height value in meters
-        Dim lngCov As Long                                              'Stores the cover value in percent cover
-        Dim lngPJ As Long = 0                                           'Stores the PJ switch
-        Dim lngSH1 As Long = 0                                          'Stores the Stand Height switch 1
-        Dim lngSH2 As Long = 0                                          'Stores the Stand Height switch 2
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
-        Dim rs2 As New ADODB.Recordset                                  'recordset for data
-
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection & strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+        Dim dbPath As String = strProjectPath & "\" & gs_LFTFCSQliteName
+        Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
 
         Try
-            Dim MUTable = MUName + "_CMB"
-            'Do GLM based method
-            '***************************Calculate for non pj
-            strSQL = "SELECT NewCCover, NewCHeight, NewCanopy " &
+            Dim MUTable As String = MUName + "_CMB"
+            Dim defVal As String = DEFAULT_FUEL_VAL.ToString()
+
+            'EVTs that are pj or j
+            Dim pjEvts As String = "2016, 2017, 2019, 2025, 2059, 2115, 2116, 2119"
+
+            Using conn As New SQLiteConnection(connString)
+                conn.Open()
+
+                'Do GLM based method
+                '***************************Calculate for non pj
+                Dim nonPjSql As String =
+                    "SELECT 0 AS EVTR, NewCCover, NewCHeight, NewCanopy " &
                     "FROM " & MUTable & " " &
-                    "WHERE (NewCanopy = 1) Or (NewCanopy = 2) Or (NewCanopy = 3)" &
-                    "Group By NewCCover, NewCHeight, NewCanopy " &
-                    "HAVING NewCCover <> 9999"
+                    "WHERE NewCanopy IN (1, 2, 3) " &
+                    "GROUP BY NewCCover, NewCHeight, NewCanopy " &
+                    "HAVING NewCCover <> " & defVal
+                Dim nonPjGroups As List(Of CbdGroup) = LoadCbdGroups(conn, nonPjSql)
 
-            rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                '**********************Calculate for just pj or j (This is only for pj that have a canopy of 1 no need to look at canopy 2
+                '**********************because it is already assigned during the non pj above
+                Dim pjSql As String =
+                    "SELECT EVTR, NewCCover, NewCHeight, NewCanopy " &
+                    "FROM " & MUTable & " " &
+                    "GROUP BY EVTR, NewCCover, NewCHeight, NewCanopy " &
+                    "HAVING EVTR IN (" & pjEvts & ") AND NewCanopy = 1"
+                Dim pjGroups As List(Of CbdGroup) = LoadCbdGroups(conn, pjSql)
 
-            Do Until rs1.EOF
-                dblHgt = rs1.Fields!NewCHeight.Value / 10   'Get the height in meters from the height code
-                lngCov = rs1.Fields!NewCCover.Value 'Get the percent cover from EVCR code
-                lngCan = rs1.Fields!NewCanopy.Value
+                Using tx As SQLiteTransaction = conn.BeginTransaction()
 
-                If lngCov = 0 Then
-                    dblCBD = 0 'If CC = 0 then CBD = 0
-                ElseIf lngCan = 2 Then
-                    dblCBD = 1 'Canopy mask is 2 so CBD gets 0.012 or 1 in kg/m^*100
-                ElseIf lngCan = 3 Then
-                    dblCBD = 5 'Canopy mask is 3 so CBD gets 0.05 or 5 in kg/m^*100
-                Else
-                    'EXP(-2.4887057+(0.0335917*CC)+(-0.356861*SH1_)+(-0.6006381*SH2_)+(-1.10691*PJ)+(-0.0010804*CC*SH1_)+(-0.0018324*CC*SH2_))
-                    'CBDpred = −2.489 + 0.034(CC)+−0.357(SH1)+−0.601(SH2)+−1.107(PJ)+−0.001(CC × SH1)+−0.002(CC × SH2)
+                    'Non pj: only fills rows still holding the default value
+                    Dim nonPjUpdate As String =
+                        "UPDATE " & MUTable & " " &
+                        "SET New" & FuelName & " = @cbd " &
+                        "WHERE NewCCover = @cov AND NewCHeight = @hgt " &
+                        "AND New" & FuelName & " = " & defVal & " " &
+                        "AND NewCanopy = @can"
 
-                    'This tells the equation that none of these are pj or j
-                    lngPJ = 1
+                    Using cmd As New SQLiteCommand(nonPjUpdate, conn, tx)
+                        cmd.Parameters.Add("@cbd", DbType.Double)
+                        cmd.Parameters.Add("@cov", DbType.Int64)
+                        cmd.Parameters.Add("@hgt", DbType.Int64)
+                        cmd.Parameters.Add("@can", DbType.Int64)
 
-                    If dblHgt < 15 Then
-                        lngSH1 = 0
-                        lngSH2 = 0
-                    ElseIf dblHgt < 30 Then
-                        lngSH1 = 1
-                        lngSH2 = 0
-                    ElseIf dblHgt >= 30 Then
-                        lngSH1 = 0
-                        lngSH2 = 1
-                    End If
-                    dblCBD = -2.4887057 + (0.0335917 * lngCov) + (-0.356861 * lngSH1) + -(0.6006381 * lngSH2) +
-                            (-1.10691 * lngPJ) + (-0.0010804 * (lngCov * lngSH1)) + (-0.0018324 * (lngCov * lngSH2))
-                    'The base natural logarithm raised to the dblCBD value multiply by 100 then integerize for kg/m^3 * 100
-                    dblCBD = System.Math.Round(System.Math.Exp(dblCBD) * CBDMult, 2) * 100
-                End If
+                        For Each g As CbdGroup In nonPjGroups
+                            'Get the height in meters from the height code
+                            cmd.Parameters("@cbd").Value = ComputeCBD(g.NewCCover, g.NewCHeight / 10.0,
+                                                                      g.NewCanopy, False, CBDMult)
+                            cmd.Parameters("@cov").Value = g.NewCCover
+                            cmd.Parameters("@hgt").Value = g.NewCHeight
+                            cmd.Parameters("@can").Value = g.NewCanopy
+                            cmd.ExecuteNonQuery()
+                        Next
+                    End Using
 
-                If dblCBD > 45 Then
-                    dblCBD = 45
-                End If
+                    'PJ: no default-value guard, so these overwrite the non pj pass
+                    Dim pjUpdate As String =
+                        "UPDATE " & MUTable & " " &
+                        "SET New" & FuelName & " = @cbd " &
+                        "WHERE EVTR = @evt AND NewCCover = @cov " &
+                        "AND NewCHeight = @hgt AND NewCanopy = @can"
 
-                'Set where values of FuelName
-                strSQL = "Update " & MUTable & " " &
-                         "Set New" & FuelName & " = " & dblCBD & " " &
-                         "WHERE (NewCCover = " & rs1.Fields!NewCCover.Value & ") And " &
-                         "(NewCHeight = " & rs1.Fields!NewCHeight.Value & ") And (New" & FuelName & " = 9999) And " &
-                         "(NewCanopy = " & rs1.Fields!NewCanopy.Value & ")"
-                dbconn.Execute(strSQL)                                                  'Run the SQL statement
+                    Using cmd As New SQLiteCommand(pjUpdate, conn, tx)
+                        cmd.Parameters.Add("@cbd", DbType.Double)
+                        cmd.Parameters.Add("@evt", DbType.Int64)
+                        cmd.Parameters.Add("@cov", DbType.Int64)
+                        cmd.Parameters.Add("@hgt", DbType.Int64)
+                        cmd.Parameters.Add("@can", DbType.Int64)
 
-                rs1.MoveNext()
-            Loop
+                        For Each g As CbdGroup In pjGroups
+                            cmd.Parameters("@cbd").Value = ComputeCBD(g.NewCCover, g.NewCHeight / 10.0,
+                                                                      g.NewCanopy, True, CBDMult)
+                            cmd.Parameters("@evt").Value = g.EVTR
+                            cmd.Parameters("@cov").Value = g.NewCCover
+                            cmd.Parameters("@hgt").Value = g.NewCHeight
+                            cmd.Parameters("@can").Value = g.NewCanopy
+                            cmd.ExecuteNonQuery()
+                        Next
+                    End Using
 
-            '**********************Calculate for just pj or j (This is only for pj that have a canopy of 1 no need to look at canopy 2
-            '**********************because it is already assigned during the non pj above
+                    'Update combo table for everywhere that Canopy = 0 and the default value
+                    Using cmd As New SQLiteCommand(
+                        "UPDATE " & MUTable & " " &
+                        "SET New" & FuelName & " = NewCanopy " &
+                        "WHERE NewCanopy = 0 OR NewCanopy = " & defVal, conn, tx)
+                        cmd.ExecuteNonQuery()
+                    End Using
 
-            strSQL = "Select " & MUTable & ".EVTR, " &
-                     MUTable & ".NewCCover, " &
-                     MUTable & ".NewCHeight, " &
-                     MUTable & ".NewCanopy " &
-                     "FROM(" & MUTable & ") " &
-                     "GROUP BY " & MUTable & ".EVTR, " &
-                     MUTable & ".NewCCover, " &
-                     MUTable & ".NewCHeight, " &
-                     MUTable & ".NewCanopy " &
-                     "HAVING (((" & MUTable & ".EVTR)=2016) And ((" & MUTable & ".NewCanopy)=1)) " &
-                     "Or (((" & MUTable & ".EVTR)=2017) And ((" & MUTable & ".NewCanopy)=1)) " &
-                     "Or (((" & MUTable & ".EVTR)=2019) And ((" & MUTable & ".NewCanopy)=1)) " &
-                     "Or (((" & MUTable & ".EVTR)=2025) And ((" & MUTable & ".NewCanopy)=1)) " &
-                     "Or (((" & MUTable & ".EVTR)=2059) And ((" & MUTable & ".NewCanopy)=1)) " &
-                     "Or (((" & MUTable & ".EVTR)=2115) And ((" & MUTable & ".NewCanopy)=1)) " &
-                     "Or (((" & MUTable & ".EVTR)=2116) And ((" & MUTable & ".NewCanopy)=1)) " &
-                     "Or (((" & MUTable & ".EVTR)=2119) And ((" & MUTable & ".NewCanopy)=1))"
-            rs2.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-
-            Do Until rs2.EOF
-                dblHgt = rs2.Fields!NewCHeight.Value / 10   'Get the height in meters from the height code
-                lngCov = rs2.Fields!NewCCover.Value 'Get the percent cover from EVCR code
-                lngEVT = rs2.Fields!EVTR.Value
-                lngCan = rs2.Fields!NewCanopy.Value
-
-                If lngCov = 0 Then
-                    dblCBD = 0 'If CC = 0 then CBD = 0
-                ElseIf lngCan = 2 Then
-                    dblCBD = 1 'Canopy mask is 2 so CBD gets 0.012 or 1 in kg/m^*100
-                ElseIf lngCan = 3 Then
-                    dblCBD = 5 'Canopy mask is 3 so CBD gets 0.05 or 5 in kg/m^*100
-                Else
-                    'EXP(-2.4887057+(0.0335917*CC)+(-0.356861*SH1_)+(-0.6006381*SH2_)+(-1.10691*PJ)+(-0.0010804*CC*SH1_)+(-0.0018324*CC*SH2_))
-                    'CBDpred = −2.489 + 0.034(CC)+−0.357(SH1)+−0.601(SH2)+−1.107(PJ)+−0.001(CC × SH1)+−0.002(CC × SH2)
-
-                    lngPJ = 0  '0 Means it is a PJ and or J EVT all EVTs selected in the strSQL are pj or j
-
-                    If dblHgt < 15 Then
-                        lngSH1 = 0
-                        lngSH2 = 0
-                    ElseIf dblHgt < 30 Then
-                        lngSH1 = 1
-                        lngSH2 = 0
-                    ElseIf dblHgt >= 30 Then
-                        lngSH1 = 0
-                        lngSH2 = 1
-                    End If
-                    dblCBD = -2.4887057 + (0.0335917 * lngCov) + (-0.356861 * lngSH1) + -(0.6006381 * lngSH2) +
-                            (-1.10691 * lngPJ) + (-0.0010804 * (lngCov * lngSH1)) + (-0.0018324 * (lngCov * lngSH2))
-                    'The base natural logarithm raised to the dblCBD value multiply by 100 then integerize for kg/m^3 * 100
-                    dblCBD = System.Math.Round(System.Math.Exp(dblCBD) * CBDMult, 2) * 100
-                End If
-                If dblCBD > 45 Then
-                    dblCBD = 45
-                End If
-
-                'Set where values of FuelName
-                strSQL = "Update " & MUTable & " " &
-                         "Set New" & FuelName & " = " & dblCBD & " " &
-                         "WHERE (EVTR = " & lngEVT & ") And (NewCCover = " & rs2.Fields!NewCCover.Value & ") And " &
-                         "(NewCHeight = " & rs2.Fields!NewCHeight.Value & ") And " &
-                         "(NewCanopy = " & rs2.Fields!NewCanopy.Value & ")"
-                dbconn.Execute(strSQL)                                                  'Run the SQL statement
-                rs2.MoveNext()
-            Loop
-
-            'Update combo table for everywhere that Canopy = 0 and 9999
-            strSQL = "Update " & MUTable & " " &
-                 "Set New" & FuelName & " = NewCanopy " &
-                 "WHERE (NewCanopy = 0) Or (NewCanopy = 9999)"
-            dbconn.Execute(strSQL)                                                      'Run the SQL statement
-
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-            If rs2.State <> 0 Then rs2.Close()
-            rs2 = Nothing
-
-            If dbconn.State <> System.Data.ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
+                    tx.Commit()
+                End Using
+            End Using
         Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-            If rs2.State <> 0 Then rs2.Close()
-            rs2 = Nothing
-
-            If dbconn.State <> System.Data.ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-
             MsgBox("Error In CalcCBDGLM " & ex.Message)
         End Try
     End Sub
+
+    Private Function LoadCbdGroups(conn As SQLiteConnection, sql As String) As List(Of CbdGroup)
+        Dim groups As New List(Of CbdGroup)
+
+        strSQL = sql
+        Using cmd As New SQLiteCommand(sql, conn)
+            Using reader As SQLiteDataReader = cmd.ExecuteReader()
+                Dim iEvt As Integer = reader.GetOrdinal("EVTR")
+                Dim iCov As Integer = reader.GetOrdinal("NewCCover")
+                Dim iHgt As Integer = reader.GetOrdinal("NewCHeight")
+                Dim iCan As Integer = reader.GetOrdinal("NewCanopy")
+
+                While reader.Read()
+                    Dim g As New CbdGroup
+                    g.EVTR = If(reader.IsDBNull(iEvt), 0L, CLng(reader.GetValue(iEvt)))
+                    g.NewCCover = If(reader.IsDBNull(iCov), 0L, CLng(reader.GetValue(iCov)))
+                    g.NewCHeight = If(reader.IsDBNull(iHgt), 0L, CLng(reader.GetValue(iHgt)))
+                    g.NewCanopy = If(reader.IsDBNull(iCan), 0L, CLng(reader.GetValue(iCan)))
+                    groups.Add(g)
+                End While
+            End Using
+        End Using
+
+        Return groups
+    End Function
 
     Private Sub AssignCC_CHProg(ByVal MUName As String, ByVal rulesG As String)
 
@@ -1070,72 +1211,90 @@ CloseAndExit:
         End Try
     End Function
 
+    Private Structure PixelGroup
+        Public EVTR As Long
+        Public DIST As Long
+        Public SumOfCOUNT As Long
+    End Structure
+
+    Private Structure RulePixelGroup
+        Public EVT As Long
+        Public DIST As Long
+        Public PC As Long
+    End Structure
+
+
     Private Function PixLeftBehind(ByVal strName As String, ByVal MUName As String, ByVal RulesTable As String) As Boolean
         'Return FALSE is cancel is pushed, TRUE is continue is pushed
 
-        Dim msgResult As String = ""
         Dim PLB = New frmPLB(strName)                                   'List box of pixels left behind
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
-        Dim rs2 As New ADODB.Recordset                                  'recordset for data
-        Dim rs3 As New ADODB.Recordset                                  'recordset for data
 
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection & strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+        Dim dbPath As String = strProjectPath & "\" & gs_LFTFCSQliteName
+        Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
 
         Try
-            Dim MUTable = MUName + "_CMB"
-            'Check for 9999 missing pixel assignments
-            strSQL = "Select " & MUTable & ".EVTR, " & MUTable & ".DIST, Sum(" & MUTable & ".COUNT) As SumOfCOUNT " &
-                     "FROM " & MUTable & " " &
-                     "GROUP BY " & MUTable & ".EVTR, " & MUTable & ".DIST, " & MUTable & ".New" & strName & " " &
-                     "HAVING (((" & MUTable & ".New" & strName & ")=9999))"
-            rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+            Dim MUTable As String = MUName + "_CMB"
+            Dim defVal As String = DEFAULT_FUEL_VAL.ToString()
 
-            Do While rs1.EOF = False
-                PLB.AddPLB(rs1.Fields!EVTR.Value & "[" & rs1.Fields!DIST.Value & "]" & vbTab & "pixels left behind " &
-                           rs1.Fields!SumOfCOUNT.Value)
-                rs1.MoveNext()
-            Loop
+            Dim missing As New List(Of PixelGroup)
+            Dim cmbCounts As New List(Of PixelGroup)
+            Dim ruleCounts As New List(Of RulePixelGroup)
 
-            '****Check for overlapping or missing rules
-            '**** Get cmb pixel counts
-            strSQL = "Select " & MUTable & ".EVTR, " & MUTable & ".DIST, Sum(" & MUTable & ".COUNT) As SumOfCOUNT " &
-                     "FROM " & MUTable & " " &
-                     "GROUP BY " & MUTable & ".EVTR, " & MUTable & ".DIST " &
-                     "ORDER BY " & MUTable & ".EVTR, " & MUTable & ".DIST;"
-            rs2.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+            Using conn As New SQLiteConnection(connString)
+                conn.Open()
 
-            '**** Get ruleset pixel counts
-            strSQL = "Select " & RulesTable & ".EVT, " & RulesTable & ".DIST, Sum(IIf((IsNull([FuelDatabase1].[PixelCount]) " &
-                     "Or ([FuelDatabase1].[PixelCount] = '')),-1, " &
-                     "CLng([" & RulesTable & "].[PixelCount]))) AS PC, [" & RulesTable & "].OnOff " &
-                     "FROM " & RulesTable & " " &
-                     "GROUP BY " & RulesTable & ".EVT, " & RulesTable & ".DIST , [" & RulesTable & "].OnOff " &
-                     "HAVING(((Sum(IIf((IsNull([FuelDatabase1].[PixelCount]) Or ([FuelDatabase1].[PixelCount] = '')), -1, " &
-                     "CLng([" & RulesTable & "].[PixelCount])))) >= 0) AND (([" & RulesTable & "].OnOff)='On')) " &
-                     "ORDER BY " & RulesTable & ".EVT, " & RulesTable & ".DIST;"
-            rs3.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                'Check for missing pixel assignments
+                missing = LoadPixelGroups(conn,
+                    "SELECT EVTR, DIST, SUM(""COUNT"") AS SumOfCOUNT " &
+                    "FROM " & MUTable & " " &
+                    "GROUP BY EVTR, DIST, New" & strName & " " &
+                    "HAVING New" & strName & " = " & defVal)
+
+                '****Check for overlapping or missing rules
+                '**** Get cmb pixel counts
+                cmbCounts = LoadPixelGroups(conn,
+                    "SELECT EVTR, DIST, SUM(""COUNT"") AS SumOfCOUNT " &
+                    "FROM " & MUTable & " " &
+                    "GROUP BY EVTR, DIST " &
+                    "ORDER BY EVTR, DIST")
+
+                '**** Get ruleset pixel counts
+                'A NULL or empty PixelCount contributes -1, forcing the group's total negative
+                'so the HAVING drops it — i.e. any rule with an uncalculated count disqualifies
+                'the whole EVT/DIST group.
+                ruleCounts = LoadRulePixelGroups(conn,
+                    "SELECT EVT, DIST, " &
+                    "SUM(CASE WHEN PixelCount IS NULL OR PixelCount = '' " &
+                        "THEN -1 ELSE CAST(PixelCount AS INTEGER) END) AS PC " &
+                    "FROM " & RulesTable & " " &
+                    "GROUP BY EVT, DIST, OnOff " &
+                    "HAVING SUM(CASE WHEN PixelCount IS NULL OR PixelCount = '' " &
+                        "THEN -1 ELSE CAST(PixelCount AS INTEGER) END) >= 0 " &
+                        "AND OnOff = 'On' " &
+                    "ORDER BY EVT, DIST")
+            End Using
+
+            For Each g As PixelGroup In missing
+                PLB.AddPLB(g.EVTR & "[" & g.DIST & "]" & vbTab & "pixels left behind " & g.SumOfCOUNT)
+            Next
 
             '****Compare and report on overlapping or missing rules
-            Do While rs2.EOF = False
-                If rs3.EOF = False Then
+            Dim r As Integer = 0        'Position in ruleCounts
+            For Each c As PixelGroup In cmbCounts
+                If r < ruleCounts.Count Then
                     'EVT and DIST numbers are the same and can be compared
-                    If ((rs2.Fields!EVTR.Value = rs3.Fields!EVT.Value) And (rs2.Fields!DIST.Value = rs3.Fields!DIST.Value)) Then
-                        If rs2.Fields!SumOfCOUNT.Value < rs3.Fields!PC.Value Then
-                            PLB.AddPLB(rs2.Fields!EVTR.Value & "[" & rs2.Fields!DIST.Value & "]" & vbTab & "overlapping rules")
+                    If c.EVTR = ruleCounts(r).EVT AndAlso c.DIST = ruleCounts(r).DIST Then
+                        If c.SumOfCOUNT < ruleCounts(r).PC Then
+                            PLB.AddPLB(c.EVTR & "[" & c.DIST & "]" & vbTab & "overlapping rules")
                         End If
-                        rs2.MoveNext()
-                        If (rs3.EOF = False) Then rs3.MoveNext()
+                        r += 1  'Only advance the ruleset when it lined up
                     Else 'EVT and DIST numbers are not the same so the ruleset is missing some rules
-                        PLB.AddPLB(rs2.Fields!EVTR.Value & "[" & rs2.Fields!DIST.Value & "]" & vbTab & "no ruleset")
-                        rs2.MoveNext() 'Only move cmb to the next ruleset to line up the next EVT and DIST numbers
+                        PLB.AddPLB(c.EVTR & "[" & c.DIST & "]" & vbTab & "no ruleset")
                     End If
                 Else 'No more rules associated with the cmb evts left so count them as missing
-                    PLB.AddPLB(rs2.Fields!EVTR.Value & "[" & rs2.Fields!DIST.Value & "]" & vbTab & "no ruleset")
-                    rs2.MoveNext() 'Only move cmb to the next ruleset to line up the next EVT and DIST numbers
+                    PLB.AddPLB(c.EVTR & "[" & c.DIST & "]" & vbTab & "no ruleset")
                 End If
-            Loop
+            Next
 
             If PLB.GetCount > 0 Then
                 PLB.ShowDialog()                            'Show PLB List
@@ -1147,32 +1306,97 @@ CloseAndExit:
             Else
                 Return True                                 'No pixel left behind - continue
             End If
-
-            PLB = Nothing
-
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-            If rs2.State <> 0 Then rs2.Close()
-            rs2 = Nothing
-            If rs3.State <> 0 Then rs3.Close()
-            rs3 = Nothing
-
-            If dbconn.State <> System.Data.ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
         Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-            If rs2.State <> 0 Then rs2.Close()
-            rs2 = Nothing
-            If rs3.State <> 0 Then rs3.Close()
-            rs3 = Nothing
-
-            If dbconn.State <> System.Data.ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-
             MsgBox("Error in PixLeftBehind " & ex.Message)
+            Return False
         End Try
     End Function
+
+    Private Function LoadPixelGroups(conn As SQLiteConnection, sql As String) As List(Of PixelGroup)
+        Dim rows As New List(Of PixelGroup)
+
+        strSQL = sql
+        Using cmd As New SQLiteCommand(sql, conn)
+            Using reader As SQLiteDataReader = cmd.ExecuteReader()
+                Dim iEvt As Integer = reader.GetOrdinal("EVTR")
+                Dim iDist As Integer = reader.GetOrdinal("DIST")
+                Dim iSum As Integer = reader.GetOrdinal("SumOfCOUNT")
+
+                While reader.Read()
+                    Dim g As New PixelGroup
+                    g.EVTR = If(reader.IsDBNull(iEvt), 0L, CLng(reader.GetValue(iEvt)))
+                    g.DIST = If(reader.IsDBNull(iDist), 0L, CLng(reader.GetValue(iDist)))
+                    g.SumOfCOUNT = If(reader.IsDBNull(iSum), 0L, CLng(reader.GetValue(iSum)))
+                    rows.Add(g)
+                End While
+            End Using
+        End Using
+
+        Return rows
+    End Function
+
+    Private Function LoadRulePixelGroups(conn As SQLiteConnection, sql As String) As List(Of RulePixelGroup)
+        Dim rows As New List(Of RulePixelGroup)
+
+        strSQL = sql
+        Using cmd As New SQLiteCommand(sql, conn)
+            Using reader As SQLiteDataReader = cmd.ExecuteReader()
+                Dim iEvt As Integer = reader.GetOrdinal("EVT")
+                Dim iDist As Integer = reader.GetOrdinal("DIST")
+                Dim iPc As Integer = reader.GetOrdinal("PC")
+
+                While reader.Read()
+                    Dim g As New RulePixelGroup
+                    g.EVT = If(reader.IsDBNull(iEvt), 0L, CLng(reader.GetValue(iEvt)))
+                    g.DIST = If(reader.IsDBNull(iDist), 0L, CLng(reader.GetValue(iDist)))
+                    g.PC = If(reader.IsDBNull(iPc), 0L, CLng(reader.GetValue(iPc)))
+                    rows.Add(g)
+                End While
+            End Using
+        End Using
+
+        Return rows
+    End Function
+
+    Private Sub WriteMULookupCsv(ByVal MUName As String, ByVal csvPath As String)
+        Dim MUTable As String = MUName + "_CMB"
+
+        Dim dbPath As String = strProjectPath + "\" + gs_LFTFCSQliteName
+        Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
+
+        Dim cols As String() = {"VALUE", "NewFBFM13", "NewFBFM40", "NewCanFM", "NewFCCS", "NewFLM",
+                                "NewCCover", "NewCHeight", "NewCBH13mx10", "NewCBH40mx10",
+                                "NewCBD13x100", "NewCBD40x100", "NewCanopy"}
+
+        Dim sql As String = "SELECT """ & String.Join(""", """, cols) & """ FROM " & MUTable
+
+        Using oWrite As New System.IO.StreamWriter(csvPath, False)
+            'Field Headings
+            oWrite.WriteLine(String.Join(",", cols))
+
+            Using conn As New SQLiteConnection(connString)
+                conn.Open()
+                Using cmd As New SQLiteCommand(sql, conn)
+                    Using reader As SQLiteDataReader = cmd.ExecuteReader()
+                        Dim ordinals(cols.Length - 1) As Integer
+                        For i As Integer = 0 To cols.Length - 1
+                            ordinals(i) = reader.GetOrdinal(cols(i))
+                        Next
+
+                        'Make lookup csv
+                        Dim fields(cols.Length - 1) As String
+                        While reader.Read()
+                            For i As Integer = 0 To cols.Length - 1
+                                fields(i) = If(reader.IsDBNull(ordinals(i)), "",
+                                               reader.GetValue(ordinals(i)).ToString())
+                            Next
+                            oWrite.WriteLine(String.Join(",", fields))
+                        End While
+                    End Using
+                End Using
+            End Using
+        End Using
+    End Sub
 
     Private Async Sub SetRasterValues(ByVal FuelList As List(Of Fuel), ByVal MUName As String)
         Await QueuedTask.Run(
@@ -1193,34 +1417,8 @@ CloseAndExit:
                     frmWork.UpdateStatus("Make " + MUName + "_LUT")
                     Dim muLayer As RasterLayer
 
-                    Dim oWrite As New System.IO.StreamWriter(strProjectPath + "\MU\tempMULUT.csv")
-                    Dim rs1 As New ADODB.Recordset                                  'recordset for data
-                    Dim dbconn As New ADODB.Connection                              'DB connection
-                    dbconn.ConnectionString = gs_DBConnection + strProjectPath + "\" + gs_LFTFCDBName
-                    dbconn.Open()
-                    Dim strSQL As String 'SQL variable for this module
-
-                    strSQL = "SELECT " + MUName + "_CMB.VALUE, " + MUName + "_CMB.NewFBFM13, " + MUName + "_CMB.NewFBFM40, " +
-                             MUName + "_CMB.NewCanFM, " + MUName + "_CMB.NewFCCS, " + MUName + "_CMB.NewFLM, " +
-                             MUName + "_CMB.NewCCover, " + MUName + "_CMB.NewCHeight, " + MUName + "_CMB.NewCBH13mx10, " +
-                             MUName + "_CMB.NewCBH40mx10, " + MUName + "_CMB.NewCBD13x100, " + MUName + "_CMB.NewCBD40x100, " +
-                             MUName + "_CMB.NewCanopy FROM " + MUName + "_CMB"
-                    rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-
-                    'Field Headings
-                    oWrite.WriteLine("VALUE, NewFBFM13, NewFBFM40, NewCanFM, NewFCCS, NewFLM, NewCCover, NewCHeight, NewCBH13mx10, " &
-                                     "NewCBH40mx10, NewCBD13x100,NewCBD40x100, NewCanopy")
-
                     'Make lookup csv
-                    Do Until rs1.EOF
-                        oWrite.WriteLine(rs1.Fields!VALUE.Value & "," & rs1.Fields!NewFBFM13.Value & "," & rs1.Fields!NewFBFM40.Value & "," &
-                                         rs1.Fields!NewCanFM.Value & "," & rs1.Fields!NewFCCS.Value & "," & +rs1.Fields!NewFLM.Value & "," &
-                                         rs1.Fields!NewCCover.Value & "," & rs1.Fields!NewCHeight.Value & "," & rs1.Fields!NewCBH13mx10.Value & "," &
-                                         rs1.Fields!NewCBH40mx10.Value & "," & rs1.Fields!NewCBD13x100.Value & "," & rs1.Fields!NewCBD40x100.Value & "," &
-                                         rs1.Fields!NewCanopy.Value)
-                        rs1.MoveNext()
-                    Loop
-                    oWrite.Close()
+                    WriteMULookupCsv(MUName, strProjectPath + "\MU\tempMULUT.csv")
 
                     'Export to dbf for OIDs and faster prfrmWork.UpdateStatus("Make DBF LUT")
                     Dim val_array = Geoprocessing.MakeValueArray(strProjectPath + "\MU\tempMULUT.csv", strProjectPath + "\MU\tempMULUT.dbf")
@@ -1309,17 +1507,16 @@ CloseAndExit:
                             'Remove FuelLayer
                             container.RemoveLayer(FuelLayer)
                         End If
+                        'Remove tempFuel
 
                         If fuel.Equals(FuelList.Last) Then
-                            container.RemoveLayer(tempLayer)         'Remove tempFuel
+                            container.RemoveLayer(tempLayer)
                         End If
                     Next
+                    container.RemoveStandaloneTable(LUT_DBF) 'Remove the dbf lut
+                    container.RemoveLayer(muLayer)      'Remove The make raster layer of MU
 
                     MessageBox.Show("Finished! Rasters are in:" + strProjectPath + "\Output")
-
-                    container.RemoveStandaloneTable(LUT_DBF) 'Remove the dbf lut
-                    container.RemoveLayer(muLayer)           'Remove The make raster layer of MU
-
                 Catch ex As Exception
                     Dim errMessageString As String = ""
                     errMessageString = errMessageString & ex.Message
@@ -1335,5 +1532,6 @@ CloseAndExit:
         'Unpause active view
         gs_Map.GetMapPanes.First.MapView.DrawingPaused = False
     End Sub
+
 End Class
 

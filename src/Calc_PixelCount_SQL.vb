@@ -1,18 +1,16 @@
-﻿Imports System.Data
-Imports System.IO
+﻿Imports System.IO
+
 Imports ArcGIS.Desktop.Framework.Contracts
 
-Friend Class BRaster
+
+Friend Class Calc_PixelCount_SQL
     Inherits Button
 
     Protected Overrides Async Sub OnClick()
         'Set local path variable
         Dim strProjectPath = gs_ProjectPath
         Dim MU = gs_MU
-        Dim dbtype = gs_db_type
-
-        'Set active map pane
-        gs_SetActiveLFTFCPane()
+        Dim dbtype = "sql" 'gs_db_type
 
         'Check for project directory
         If gs_validProject = False Then
@@ -24,15 +22,6 @@ Friend Class BRaster
             End If
         Else
             Try
-
-                'Check for index
-                gf_CheckForDBIndex(gs_ProjectPath, gs_MU())
-
-                Dim FUELGrid = New frmGRID()
-
-                ' Hide before running python
-                FUELGrid.Hide()
-
                 ' Toolbox Parameters
                 Dim myParams As New List(Of String)
                 myParams.Add(strProjectPath) ' project path
@@ -44,12 +33,8 @@ Friend Class BRaster
 
                 ' Run shared python call
                 Await gt_PixelPYT(thetool, myParams, gs_MU())
-
-                'Open Create Fuel GRID
-                FUELGrid.Show()
-                FUELGrid = Nothing
             Catch ex As Exception
-                MsgBox("Fuel GRID " + ex.Message)
+                MsgBox("Pixel Count " + ex.Message)
             End Try
         End If
     End Sub

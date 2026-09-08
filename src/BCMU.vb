@@ -1,4 +1,5 @@
 ﻿Imports System.Data
+Imports System.Data.SQLite
 Imports ArcGIS.Desktop.Framework.Contracts
 
 
@@ -25,7 +26,7 @@ Public Class BCMU
 
     'Private Sub UpdateCombo()
     Protected Overrides Sub OnUpdate()
-        'TODO – customize this method to populate the combobox with your desired items 
+        'TODO – customize this method to populate the combobox with desired items 
         Try
             'Check for project directory and change flag
             If gs_validProject = False Then
@@ -36,35 +37,34 @@ Public Class BCMU
 
                 'Populate/Update the MU combo box
                 Dim strSQL As String                                            'SQL variable for this module
-                Dim rs1 As New ADODB.Recordset                                  'recordset for data
 
-                Dim dbconn As New ADODB.Connection                              'DB connection
-                dbconn.ConnectionString = gs_DBConnection &
-                    gs_ProjectPath & "\" & gs_LFTFCDBName
-                dbconn.Open()
+                Using conn As New SQLiteConnection("Data Source=" & gs_ProjectPath & "\" & gs_LFTFCSQliteName)
+                    conn.Open()
 
-                'Clear before adding 
-                Clear()
+                    ' Clear the ComboBox before adding items
+                    Clear()
 
-                strSQL = "SELECT Name " &
-                             "FROM DATA_MU_Name " &
-                             "ORDER BY Name"
-                rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                    strSQL = "
+                    SELECT Name
+                    FROM DATA_MU_Name
+                    ORDER BY Name;
+                "
 
-                If rs1.EOF = True Then
-                    Add(New ComboBoxItem("No MUs available"))
-                Else
-                    Do While rs1.EOF <> True
-                        Add(New ComboBoxItem(rs1.Fields!Name.Value))
-                        rs1.MoveNext()
-                    Loop
-                End If
+                    Using cmd As New SQLiteCommand(strSQL, conn)
+                        Using reader As SQLiteDataReader = cmd.ExecuteReader()
 
-                If rs1.State <> 0 Then rs1.Close()
-                rs1 = Nothing
+                            If Not reader.HasRows Then
+                                Add(New ComboBoxItem("No MUs available"))
+                            Else
+                                While reader.Read()
+                                    Add(New ComboBoxItem(reader("Name").ToString()))
+                                End While
+                            End If
 
-                If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-                dbconn = Nothing
+                        End Using
+                    End Using
+
+                End Using
 
                 'Update the MU count
                 gs_MUCount = ItemCollection.Count
@@ -81,7 +81,7 @@ Public Class BCMU
         Catch ex As Exception
             MsgBox("Error in LFTFCTBCMU - " & ex.Message & vbCrLf &
                    "Possible solutions" & vbCrLf &
-                   "    - Microsoft Office Access needs to be 64 bit." &
+                   "    - SQLite database must be present" &  '"    - Microsoft Office Access needs to be 64 bit." &
                    "    - Project folder must have folders (Input, MU, and Output)" &
                    "    - Project folder must have accessdatabase LF_TFC_toolbar.mdb not .accdb ")
             Clear()
@@ -90,7 +90,6 @@ Public Class BCMU
 
             gs_validProject = False
         End Try
-        'End If
     End Sub
 
     ''' <summary>

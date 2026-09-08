@@ -4,16 +4,9 @@ Imports System.Drawing
 Imports System.IO
 Imports System.Threading
 Imports System.Windows.Forms
-'Imports ArcGIS.Core.Internal.CIM
-Imports ArcGIS.Desktop.Core
-Imports ArcGIS.Desktop.Core.Geoprocessing
-'Imports ArcGIS.Desktop.Internal.Mapping.Views.PropertyPages.Map.TransformationViewModel
-Imports ArcGIS.Desktop.Mapping.Events
 Imports FastReport.DataVisualization.Charting
 Imports Windows.Win32.System.Diagnostics
-Imports ArcGIS.Desktop.Framework
-Imports ArcGIS.Desktop.Framework.AddIn
-Imports ArcGIS.Desktop.Framework.Contracts
+Imports System.Data.SQLite
 
 Public Class frmRule
 
@@ -36,42 +29,6 @@ Public Class frmRule
     Private chrtCompFM As Chart
     Private startIntervalMarque As Date = Date.Now                                  'Stores start time
 
-
-    'Private Async Function PixelPYT(ByVal thetool As String, ByVal myParams As List(Of String), ByVal MU As String) As Task(Of Boolean)
-
-    '    ' Create the popup window
-    '    Dim working = New WorkingWindow()
-
-    '    ' Set ArcGIS Pro's main window as the owner (so it centers correctly)
-    '    Dim helper = New System.Windows.Interop.WindowInteropHelper(working)
-    '    helper.Owner = Process.GetCurrentProcess().MainWindowHandle
-
-    '    ' SHOW the popup
-    '    working.Show()
-    '    ' Pause to allow popup to render
-    '    Await Task.Yield()
-
-    '    ' OPTIONAL: Freeze ArcGIS Pro UI
-    '    ProApp.Current.MainWindow.IsEnabled = False
-
-    '    Try
-
-    '        Dim pixel_result As IGPResult = Await Geoprocessing.ExecuteToolAsync(thetool, myParams, Nothing)
-
-    '        ' Close popup
-    '        working.Close()
-    '        ' Re-enable ArcGIS Pro UI
-    '        ProApp.Current.MainWindow.IsEnabled = True
-
-    '        Return (Not pixel_result.IsFailed)
-
-    '    Catch ex As Exception
-    '        working.Close()
-    '        ProApp.Current.MainWindow.IsEnabled = True
-    '        MessageBox.Show(ex.ToString(), "pyt data")
-    '    End Try
-
-    'End Function
     Public Sub New(ByVal setComboR As String, ByVal setRulesR As String, ByVal SetMUName As String)
         ' This call is required by the Windows Form Designer.
         InitializeComponent()
@@ -107,113 +64,107 @@ Public Class frmRule
         Dim LUT_Name As String 'Set the lookup name field
         Dim LUT_Num As String 'Set the lookup number field
         Dim PCUprocessed As Integer 'Stores how have rules have been processed
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
+        Dim dbtype = "sql" 'gs_db_type
 
         ' Toolbox Parameters
         Dim myParams As New List(Of String)
         myParams.Add(strProjectPath) ' project path
         myParams.Add(MU) ' mu
-
-        'Dim toolboxPath As String = "E:\e_GIS\LFTFC\repos\v4.04\tools\SetInitialFuelPixels.pyt"
+        'myParams.Add(dbtype)
 
         Dim tool As String = "Rules_Setup"
         Dim thetool As String = Path.Combine(gs_toolboxpath, tool)
 
         Dim pixel_result = Await gt_PixelPYT(thetool, myParams, MU)
 
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
 
-        Try
-            TTSession.SetToolTip(txtSessionName, "This puts a name in the change notes for each fuel rule")
+        ' Build the SQLite connection string
+        'Dim dbPath As String = Path.Combine(strProjectPath, "LFTFC_new.sqlite")
+        Dim dbPath As String = Path.Combine(gs_ProjectPath, gs_LFTFCSQliteName)
+        Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
 
-            'Add Compare FM Graph chart and area
-            CreateChrtCompFM()
+        Using dbConn As New SQLiteConnection(connString)
+            dbConn.Open()
 
-            'Add Distribution Graph chart and area
-            CreateChrtDist()
+            Try
+                TTSession.SetToolTip(txtSessionName, "This puts a name in the change notes for each fuel rule")
 
-            'Set the collections to new collections
-            RulesetCollection = New Collection
-            EVTPixelCountCollection = New Collection
-            m_ColCW = New Collection
+                'Add Compare FM Graph chart and area
+                CreateChrtCompFM()
 
-            'Set the MU
-            comboR = setComboR
-            rulesR = setRulesR
-            Text = "Fuel Rules for MU " & MU
+                'Add Distribution Graph chart and area
+                CreateChrtDist()
 
-            gs_EVTPixelCount(comboR, rulesR, EVTPixelCountCollection, strProjectPath) 'Totals count of pixels/evt and stores them in m_EVTPixelCountCollection
+                'Set the collections to new collections
+                RulesetCollection = New Collection
+                EVTPixelCountCollection = New Collection
+                m_ColCW = New Collection
 
-            'Populate cmbSortEVT
-            With cmbSortRules
-                .Items.Add("All by Type")
-                .Items.Add("All by EVT")
-                .Items.Add("Disturbed by Type")
-                .Items.Add("Disturbed by EVT")
-                .Items.Add("Specific EVT")
-            End With
+                'Set the MU
+                comboR = setComboR
+                rulesR = setRulesR
+                Text = "Fuel Rules for MU " & MU
 
-            strSQL = "SELECT LUT_DistCode.Type " &
-                     "FROM " & comboR & " INNER JOIN LUT_DistCode ON " & comboR & ".DIST = LUT_DistCode.DistCode " &
-                     "GROUP BY LUT_DistCode.Type " &
-                     "ORDER BY Max([Lut_DistCode]![ID])"
-            gf_SetControl(cmbSortRules, strSQL, strProjectPath)
-            cmbSortRules.SelectedIndex = 0
+                gs_EVTPixelCount(comboR, rulesR, EVTPixelCountCollection, strProjectPath) 'Totals count of pixels/evt and stores them in m_EVTPixelCountCollection
+
+                'Populate cmbSortEVT
+                With cmbSortRules
+                    .Items.Add("All by Type")
+                    .Items.Add("All by EVT")
+                    .Items.Add("Disturbed by Type")
+                    .Items.Add("Disturbed by EVT")
+                    .Items.Add("Specific EVT")
+                End With
+
+                strSQL = "SELECT LUT_DistCode.Type " &
+                         "FROM " & comboR & " INNER JOIN LUT_DistCode ON " & comboR & ".DIST = LUT_DistCode.DistCode " &
+                         "GROUP BY LUT_DistCode.Type " &
+                         "ORDER BY Max(LUT_DistCode.ID)"
+                gf_SetControl(cmbSortRules, strSQL, strProjectPath)
+                cmbSortRules.SelectedIndex = 0
 
 
-            'Start cmbEVT filled with "All By Type"
-            LUT_Table = "XWALK_EVT_EVG_EVS"
-            LUT_Name = "EVT_Name"
-            LUT_Num = "EVT"
+                'Start cmbEVT filled with "All By Type"
+                LUT_Table = "XWALK_EVT_EVG_EVS"
+                LUT_Name = "EVT_Name"
+                LUT_Num = "EVT"
 
-            strSQL = "SELECT " & comboR & ".EVTR, " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name & " " &
-                     "FROM " & comboR & " LEFT JOIN " & LUT_Table & " " &
-                     "ON " & comboR & ".EVTR = " & LUT_Table & "." & LUT_Num & " " &
-                     "GROUP BY " & comboR & ".EVTR, " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name & " " &
-                     "ORDER BY " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name
+                strSQL = "SELECT " & comboR & ".EVTR, " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name & " " &
+                         "FROM " & comboR & " LEFT JOIN " & LUT_Table & " " &
+                         "ON " & comboR & ".EVTR = " & LUT_Table & "." & LUT_Num & " " &
+                         "GROUP BY " & comboR & ".EVTR, " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name & " " &
+                         "ORDER BY " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name
 
-            cmbEVT.Items.Clear()
-            gf_SetControl(cmbEVT, strSQL, strProjectPath, rdoName.Checked)
-            cmbEVT.SelectedIndex = 0
+                cmbEVT.Items.Clear()
+                gf_SetControl(cmbEVT, strSQL, strProjectPath, rdoName.Checked)
+                cmbEVT.SelectedIndex = 0
 
-            'Make rulesets and display them
-            gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR,
-                          RulesetCollection, EVTPixelCountCollection, strProjectPath)
+                'Make rulesets and display them
+                gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR,
+                              RulesetCollection, EVTPixelCountCollection, strProjectPath)
 
-            DisplayRuleset()
-            AdjPer()
+                DisplayRuleset()
+                AdjPer()
 
-            'Set txtNotes
-            With txtNotes
-                .Text = ""
-                .Enabled = False 'Remains disabled so changes can't be made until a rule is selected
-            End With
+                'Set txtNotes
+                With txtNotes
+                    .Text = ""
+                    .Enabled = False 'Remains disabled so changes can't be made until a rule is selected
+                End With
 
-            'Set txtEVTDescription
-            With txtEVTDescription
-                .Text = ""
-            End With
+                'Set txtEVTDescription
+                With txtEVTDescription
+                    .Text = ""
+                End With
 
-            'Set Compare Fuel Models
-            InitCompareFM()
+                'Set Compare Fuel Models
+                InitCompareFM()
 
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
+            Catch ex As Exception
 
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-        Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-
-            MsgBox("Error in frmRule New - " & ex.Message)
-        End Try
+                MsgBox("Error in frmRule New - " & ex.Message)
+            End Try
+        End Using
     End Function
 
     Private Sub frmFUEL_ResizeEnd(ByVal sender As Object, ByVal e As System.EventArgs) Handles MyBase.ResizeEnd
@@ -353,7 +304,7 @@ Public Class frmRule
 
                 AddRule.ShowDialog()
 
-                System.Threading.Thread.Sleep(1000) 'Let the copy query catchup
+                Thread.Sleep(1000) 'Let the copy query catchup
 
                 gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR,
                               RulesetCollection, EVTPixelCountCollection, strProjectPath)
@@ -382,7 +333,7 @@ Public Class frmRule
                                                  rulesR, comboR, RulesetCollection, strProjectPath)
                     EditRule.ShowDialog()
 
-                    System.Threading.Thread.Sleep(1000) 'Let the copy query catchup
+                    Thread.Sleep(1000) 'Let the copy query catchup
 
                     gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR,
                                   RulesetCollection, EVTPixelCountCollection, strProjectPath)
@@ -403,12 +354,6 @@ Public Class frmRule
     Private Sub cmdDeleteRule_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles cmdDeleteRule.Click
 
         If IsEVTSelected() Then
-            Dim rs1 As New ADODB.Recordset                                  'recordset for data
-
-            Dim dbconn As New ADODB.Connection                              'DB connection
-            dbconn.ConnectionString = gs_DBConnection &
-            strProjectPath & "\" & gs_LFTFCDBName
-            dbconn.Open()
 
             Try
                 If lstVwRulesets.SelectedItems.Count = 0 Then
@@ -417,24 +362,40 @@ Public Class frmRule
                     "If you turn the rule off you can keep it for notes" & vbCrLf &
                     "and it won't be included in your analysis.", vbYesNo, "Delete Rule?") = vbYes Then
 
-                    'Remove rule from database
-                    Dim i As Integer 'Use to count
-                    i = 0
-                    Do Until i = lstVwRulesets.SelectedItems.Count
-                        strSQL = "DELETE FROM " & rulesR & " " &
-                                "WHERE Id = " & RulesetCollection.Item(lstVwRulesets.SelectedItems(i).Index + 1).Id
-                        dbconn.Execute(strSQL)
+                    ' Build the SQLite connection string
+                    Dim dbPath As String = Path.Combine(gs_ProjectPath, gs_LFTFCSQliteName)
+                    Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
 
-                        i = i + 1
-                    Loop
+                    'Do all database work here and close the connection before recalculating.
+                    'SQLite locks the file, so holding this connection open while gr_ClearPAP
+                    'and gr_MakeRuleset open their own connections makes their writes fail.
+                    'Access/Jet tolerated the overlapping connections, SQLite does not.
+                    Using dbconn As New SQLiteConnection(connString)
+                        dbconn.Open()
 
-                    'Close DB before moving to other operations
-                    If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-                    dbconn = Nothing
+                        'Remove rule from database
+                        Dim i As Integer 'Use to count
+                        i = 0
+                        Do Until i = lstVwRulesets.SelectedItems.Count
+                            strSQL = "DELETE FROM " & rulesR & " " &
+                                    "WHERE Id = " & RulesetCollection.Item(lstVwRulesets.SelectedItems(i).Index + 1).Id
+                            RunNonQuery(dbconn, strSQL)
+
+                            i = i + 1
+                        Loop
+
+                        'Blank the pixel count on the remaining rules for this EVT/DIST. That empty
+                        'value is the sentinel gr_MakeRuleset looks for to decide it must recalculate.
+                        'Done in one statement rather than relying on the clsRule.PixelCount setter,
+                        'which opens a connection per rule and swallows any failure.
+                        strSQL = "UPDATE " & rulesR & " SET PixelCount = '' " &
+                                "WHERE EVT = " & gf_GetNum(cmbEVT.Text, "EVT") & " " &
+                                "AND DIST = " & gf_GetNum(cmbEVT.Text, "DIST")
+                        RunNonQuery(dbconn, strSQL)
+                    End Using
 
                     'Remove rule from Ruleset collection
                     gr_ClearPAP(RulesetCollection) 'Clears the pixel count, acres, and percent evt of the ruleset
-
                     gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR,
                                   RulesetCollection, EVTPixelCountCollection, strProjectPath)
                     DisplayRuleset()
@@ -442,10 +403,8 @@ Public Class frmRule
                 End If
 
             Catch ex As Exception
-
-                If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-                dbconn = Nothing
                 MsgBox("Error in cmdDeleteRule_Click - " & ex.Message)
+
             End Try
         End If
 
@@ -518,178 +477,203 @@ Public Class frmRule
 
     End Sub
 
-    Private Sub TabControl_MouseClick(ByVal sender As Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles TabControl.MouseClick
+    Private Sub TabControl_MouseClick(sender As Object, e As MouseEventArgs) Handles TabControl.MouseClick
 
-        grpCanopyLines.Visible = False   'Don't show this group to start with
+        grpCanopyLines.Visible = False
 
         If IsEVTSelected() Then
-            Dim rs1 As New ADODB.Recordset                                  'recordset for data
 
-            Dim dbconn As New ADODB.Connection                              'DB connection
-            dbconn.ConnectionString = gs_DBConnection &
-            strProjectPath & "\" & gs_LFTFCDBName
-            dbconn.Open()
+            Using conn As New SQLiteConnection("Data Source=" & strProjectPath & "\" & gs_LFTFCSQliteName)
+                conn.Open()
 
-            Try
-                Dim EOFFlag As Boolean 'Flags if the EVT exists
+                Try
+                    Dim EOFFlag As Boolean
 
-                'Check to see the the selected EVT in the combobox exists in CMB for the specific zone
-                strSQL = "SELECT EVTR, DIST " &
+                    strSQL =
+                    "SELECT EVTR, DIST " &
                     "FROM " & comboR & " " &
-                    "WHERE (EVTR = " & gf_GetNum(cmbEVT.Text, "EVT") & " And DIST = " & gf_GetNum(cmbEVT.Text, "DIST") & ")"
-                rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                    "WHERE EVTR = " & gf_GetNum(cmbEVT.Text, "EVT") &
+                    " AND DIST = " & gf_GetNum(cmbEVT.Text, "DIST")
 
-                EOFFlag = rs1.EOF
+                    Using cmd As New SQLiteCommand(strSQL, conn)
+                        Using reader As SQLiteDataReader = cmd.ExecuteReader()
 
-                If EOFFlag = False Then
-                    'Populate the active tab If not EOF it acts normal else clear values and do nothing else
-                    If TabControl.SelectedIndex = 0 Then
-                        gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR,
-                                      RulesetCollection, EVTPixelCountCollection, strProjectPath)
-                        DisplayRuleset()
-                        AdjPer()
-                        cmdAutoRule.Enabled = False             'Disabled. Not in use anymore
-                        cmdAddRule.Enabled = True
-                        cmdCopyRule.Enabled = True
-                        cmdDeleteRule.Enabled = True
-                        cmdEditRule.Enabled = True
-                    ElseIf TabControl.SelectedIndex = 2 Then
+                            EOFFlag = Not reader.HasRows
+
+                            If EOFFlag = False Then
+
+                                If TabControl.SelectedIndex = 0 Then
+                                    gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"),
+                                               gf_GetNum(cmbEVT.Text, "DIST"),
+                                               comboR, rulesR,
+                                               RulesetCollection, EVTPixelCountCollection,
+                                               strProjectPath)
+                                    DisplayRuleset()
+                                    AdjPer()
+                                    cmdAutoRule.Enabled = False
+                                    cmdAddRule.Enabled = True
+                                    cmdCopyRule.Enabled = True
+                                    cmdDeleteRule.Enabled = True
+                                    cmdEditRule.Enabled = True
+
+                                ElseIf TabControl.SelectedIndex = 2 Then
+                                    cmdAutoRule.Enabled = False
+                                    cmdAddRule.Enabled = False
+                                    cmdCopyRule.Enabled = False
+                                    cmdDeleteRule.Enabled = False
+                                    cmdEditRule.Enabled = False
+
+                                    gf_PopBPS(cmbBPSGraph,
+                                          gf_GetNum(cmbEVT.Text, "EVT"),
+                                          gf_GetNum(cmbEVT.Text, "DIST"),
+                                          comboR, strProjectPath)
+
+                                    gf_PopWild(cmbWildGraph,
+                                           gf_GetNum(cmbEVT.Text, "EVT"),
+                                           gf_GetNum(cmbEVT.Text, "DIST"),
+                                           gf_GetNum(cmbBPSGraph.Text, "General"),
+                                           comboR, strProjectPath)
+
+                                    grpCanopyLines.Visible = True
+                                    DistGraph()
+
+                                ElseIf TabControl.SelectedIndex = 3 Then
+                                    cmdAutoRule.Enabled = False
+                                    cmdAddRule.Enabled = False
+                                    cmdCopyRule.Enabled = False
+                                    cmdDeleteRule.Enabled = False
+                                    cmdEditRule.Enabled = False
+                                    GetEVTDescription()
+                                End If
+
+                            Else
+                                lstVwRulesets.Items.Clear()
+                                chrtDist.Visible = False
+                            End If
+
+                        End Using
+                    End Using
+
+                    If TabControl.SelectedIndex = 1 Then
                         cmdAutoRule.Enabled = False
                         cmdAddRule.Enabled = False
                         cmdCopyRule.Enabled = False
                         cmdDeleteRule.Enabled = False
                         cmdEditRule.Enabled = False
-
-                        gf_PopBPS(cmbBPSGraph, gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"),
-                                                             comboR, strProjectPath)
-                        gf_PopWild(cmbWildGraph, gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"),
-                        gf_GetNum(cmbBPSGraph.Text, "General"), comboR, strProjectPath)
-                        grpCanopyLines.Visible = True                               'Show the group cbh cbd option
-
-                        DistGraph()                                                 'Create the graph
-                    ElseIf TabControl.SelectedIndex = 3 Then
-                        cmdAutoRule.Enabled = False
-                        cmdAddRule.Enabled = False
-                        cmdCopyRule.Enabled = False
-                        cmdDeleteRule.Enabled = False
-                        cmdEditRule.Enabled = False
-                        GetEVTDescription() 'Get EVT Description and set txtEVTDescription box
+                        InitCompareFM()
+                        GraphCompareFM()
                     End If
-                Else
-                    lstVwRulesets.Items.Clear()
-                    chrtDist.Visible = False
-                End If
 
-                If TabControl.SelectedIndex = 1 Then
-                    cmdAutoRule.Enabled = False
-                    cmdAddRule.Enabled = False
-                    cmdCopyRule.Enabled = False
-                    cmdDeleteRule.Enabled = False
-                    cmdEditRule.Enabled = False
-                    InitCompareFM()
-                    GraphCompareFM()
-                End If
+                Catch ex As Exception
+                    MsgBox("Error in TabControl_MouseClick - " & ex.Message)
+                End Try
 
-                If rs1.State <> 0 Then rs1.Close()
-                rs1 = Nothing
+            End Using ' auto cleans connection
 
-                If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-                dbconn = Nothing
-            Catch ex As Exception
-                If rs1.State <> 0 Then rs1.Close()
-                rs1 = Nothing
-
-                If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-                dbconn = Nothing
-                MsgBox("Error in TabControl_MouseClick - " & ex.Message)
-            End Try
         End If
+
     End Sub
 
     Private Sub SetTabs()
-        Dim EOFFlag As Boolean                                          'Flags if the EVT exists
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
-        Dim rs2 As New ADODB.Recordset                                  'recordset for data
 
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
-        Try
+        grpCanopyLines.Visible = False
 
-            grpCanopyLines.Visible = False   'Don't show this group to start with
+        Using conn As New SQLiteConnection("Data Source=" & strProjectPath & "\" & gs_LFTFCSQliteName)
+            conn.Open()
 
-            If IsEVTSelected() Then
-                'Check to see the the selected EVT in the combobox exists in CMB for the specific zone
-                strSQL = "SELECT EVTR, DIST " &
-                         "FROM " & comboR & " " &
-                         "WHERE (EVTR = " & gf_GetNum(cmbEVT.Text, "EVT") & " And DIST = " & gf_GetNum(cmbEVT.Text, "DIST") & ")"
-                rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+            Try
+                If IsEVTSelected() Then
 
-                EOFFlag = rs1.EOF
+                    ' Check EVT/DIST exists in comboR table
+                    Dim sqlEVT As String =
+                    "SELECT EVTR, DIST FROM " & comboR &
+                    " WHERE EVTR = @evt AND DIST = @dist"
 
-                If EOFFlag = False Then
+                    Dim evtExists As Boolean
 
-                    lblDistCode.Text = "Not disturbed"
+                    Using cmd As New SQLiteCommand(sqlEVT, conn)
+                        cmd.Parameters.AddWithValue("@evt", gf_GetNum(cmbEVT.Text, "EVT"))
+                        cmd.Parameters.AddWithValue("@dist", gf_GetNum(cmbEVT.Text, "DIST"))
 
-                    'Get Disturbance, Severity, and Time Since Disturbance and change the evt tooltip to reflect it
-                    If gf_GetNum(cmbEVT.Text, "DIST") > 0 Then
-                        strSQL = "SELECT Description " &
-                            "FROM LUT_DistCode " &
-                            "WHERE DistCode = " & gf_GetNum(cmbEVT.Text, "DIST")
-                        rs2.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                        Using reader As SQLiteDataReader = cmd.ExecuteReader()
+                            evtExists = reader.HasRows
+                        End Using
+                    End Using
 
-                        If rs2.EOF = False Then
-                            lblDistCode.Text = gf_GetNum(cmbEVT.Text, "DIST") & " " & rs2.Fields!Description.Value
-                        Else
-                            'Nothing
+                    If evtExists Then
+
+                        lblDistCode.Text = "Not disturbed"
+
+                        ' If DIST > 0, lookup disturbance description
+                        If gf_GetNum(cmbEVT.Text, "DIST") > 0 Then
+
+                            Dim sqlDist As String =
+                            "SELECT Description FROM LUT_DistCode WHERE DistCode = @dist"
+
+                            Using cmd2 As New SQLiteCommand(sqlDist, conn)
+                                cmd2.Parameters.AddWithValue("@dist", gf_GetNum(cmbEVT.Text, "DIST"))
+
+                                Using reader2 As SQLiteDataReader = cmd2.ExecuteReader()
+                                    If reader2.Read() Then
+                                        lblDistCode.Text =
+                                        gf_GetNum(cmbEVT.Text, "DIST") & " " &
+                                        reader2("Description").ToString()
+                                    End If
+                                End Using
+                            End Using
                         End If
+
+
+                        ' === Active Tab Actions ===
+                        Select Case TabControl.SelectedIndex
+
+                            Case 0
+                                gr_MakeRuleset(
+                                gf_GetNum(cmbEVT.SelectedItem, "EVT"),
+                                gf_GetNum(cmbEVT.Text, "DIST"),
+                                comboR,
+                                rulesR,
+                                RulesetCollection,
+                                EVTPixelCountCollection,
+                                strProjectPath)
+                                DisplayRuleset()
+                                AdjPer()
+
+                            Case 2
+                                gf_PopBPS(cmbBPSGraph,
+                                      gf_GetNum(cmbEVT.Text, "EVT"),
+                                      gf_GetNum(cmbEVT.Text, "DIST"),
+                                      comboR,
+                                      strProjectPath)
+
+                                gf_PopWild(cmbWildGraph,
+                                       gf_GetNum(cmbEVT.SelectedItem, "EVT"),
+                                       gf_GetNum(cmbEVT.SelectedItem, "DIST"),
+                                       gf_GetNum(cmbBPSGraph.SelectedItem, "General"),
+                                       comboR,
+                                       strProjectPath)
+
+                                grpCanopyLines.Visible = True
+                                rdoNoneDistGraph.Checked = True
+                                DistGraph()
+
+                            Case 3
+                                GetEVTDescription()
+
+                        End Select
+
+                    Else
+                        lstVwRulesets.Items.Clear()
+                        chrtDist.Visible = False
                     End If
-
-                    'Populate the active tab If not EOF it acts normal else clear values and do nothing else
-                    If TabControl.SelectedIndex = 0 Then
-                        gr_MakeRuleset(gf_GetNum(cmbEVT.SelectedItem, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR,
-                                      RulesetCollection, EVTPixelCountCollection, strProjectPath)
-                        DisplayRuleset()
-                        AdjPer()
-                    ElseIf TabControl.SelectedIndex = 2 Then
-                        gf_PopBPS(cmbBPSGraph, gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"),
-                                                             comboR, strProjectPath)
-                        gf_PopWild(cmbWildGraph, gf_GetNum(cmbEVT.SelectedItem, "EVT"), gf_GetNum(cmbEVT.SelectedItem, "DIST"),
-                        gf_GetNum(cmbBPSGraph.SelectedItem, "General"), comboR, strProjectPath)
-
-                        grpCanopyLines.Visible = True    'Show the group cbh cbd option
-
-                        rdoNoneDistGraph.Checked = True 'Set to none when changes occur
-                        DistGraph()                     'Create the graph
-
-                    ElseIf TabControl.SelectedIndex = 3 Then
-                        GetEVTDescription()             'Get EVT Description and set txtEVTDescription box
-                    End If
-                Else
-                    lstVwRulesets.Items.Clear()
-                    chrtDist.Visible = False
                 End If
-            End If
 
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-            If rs2.State <> 0 Then rs2.Close()
-            rs2 = Nothing
+            Catch ex As Exception
+                MsgBox("Error in SetTabs - " & ex.Message)
+            End Try
 
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-        Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-            If rs2.State <> 0 Then rs2.Close()
-            rs2 = Nothing
+        End Using ' connection auto-closes
 
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-
-            MsgBox("Error in SetTabs - " & ex.Message)
-        End Try
     End Sub
 
     Private Sub DisplayRuleset()
@@ -808,44 +792,9 @@ Public Class frmRule
     End Sub
 
     Public Sub GetEVTDescription()
-        Dim rs1 As New ADODB.Recordset                                  'recordset for dataDrawing.
-
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
 
         txtEVTDescription.Text = "See Landfire.gov website for updated vegetation descriptions."
 
-        'Try
-        '    If IsEVTSelected() Then
-        '        'Selects the Description for the given EVT number
-        '        strSQL = "SELECT XWALK_EVT_EVG_EVS.Description " &
-        '                "FROM XWALK_EVT_EVG_EVS " &
-        '                "WHERE ((Mid([XWALK_EVT_EVG_EVS]![EVT],2,3)=" & Strings.Mid(gf_GetNum(cmbEVT.SelectedItem, "EVT"), 2, 3) & "))"
-        '        rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-
-        '        If rs1.EOF = False Then
-        '            txtEVTDescription.Text = rs1.Fields(0).Value & ""
-        '        Else
-        '            txtEVTDescription.Text = ""
-        '        End If
-        '    End If
-
-        '    If rs1.State <> 0 Then rs1.Close()
-        '    rs1 = Nothing
-
-        '    If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-        '    dbconn = Nothing
-        'Catch ex As Exception
-        '    If rs1.State <> 0 Then rs1.Close()
-        '    rs1 = Nothing
-
-        '    If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-        '    dbconn = Nothing
-
-        '    MsgBox("Error in GetEVTDescription - " & ex.Message)
-        'End Try
     End Sub
 
     Private Sub InitCompareFM()
@@ -913,45 +862,55 @@ Public Class frmRule
         Dim colFM As New Collection 'Stores all the fuel model objects
         fmNewFM = Nothing
 
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
+        Using conn As New SQLiteConnection("Data Source=" & strProjectPath & "\" & gs_LFTFCSQliteName)
+            conn.Open()
 
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+            Try
+                'Populate the fuelmodel collection
+                strSQL = "SELECT FMNum, FMCode, FL1H, FL10H, FL100H, FLLiveH, FLLiveW, FMType, H1SAV, LiveHSAV, LiveWSAV, " &
+                    "Depth, XtMoist, DHt, LHt, FMName, DataType, Creator " &
+                    "FROM LUT_FuelModelParameters"
 
-        Try
-            'Populate the fuelmodel collection
-            strSQL = "SELECT FMNum, FMCode, FL1H, FL10H, FL100H, FLLiveH, FLLiveW, FMType, H1SAV, LiveHSAV, LiveWSAV, " &
-                     "Depth, XtMoist, DHt, LHt, FMName, DataType, Creator " &
-                     "FROM LUT_FuelModelParameters"
-            rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                Using cmd As New SQLiteCommand(strSQL, conn)
+                    Using reader As SQLiteDataReader = cmd.ExecuteReader()
 
-            Do While rs1.EOF = False
-                fmNewFM = New clsFM(rs1.Fields!DataType.Value, rs1.Fields!FMNum.Value, rs1.Fields!FMCode.Value,
-                                    rs1.Fields!FL1H.Value, rs1.Fields!FL10H.Value, rs1.Fields!FL100H.Value,
-                                    rs1.Fields!FLLiveH.Value, rs1.Fields!FLLiveW.Value, rs1.Fields!FMType.Value,
-                                    rs1.Fields!H1SAV.Value, rs1.Fields!LiveHSAV.Value, rs1.Fields!LiveWSAV.Value,
-                                    rs1.Fields!Depth.Value, rs1.Fields!XtMoist.Value, rs1.Fields!DHt.Value,
-                                    rs1.Fields!LHt.Value, rs1.Fields!FMName.Value, rs1.Fields!Creator.Value)
-                colFM.Add(fmNewFM, "FM" & rs1.Fields!FMNum.Value)
-                rs1.MoveNext()
-            Loop
 
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
+                        While reader.Read()
+                            fmNewFM = New clsFM(
+                                reader("DataType").ToString(),
+                                CInt(reader("FMNum")),
+                                reader("FMCode").ToString(),
+                                CDbl(reader("FL1H")),
+                                CDbl(reader("FL10H")),
+                                CDbl(reader("FL100H")),
+                                CDbl(reader("FLLiveH")),
+                                CDbl(reader("FLLiveW")),
+                                reader("FMType").ToString(),
+                                CDbl(reader("H1SAV")),
+                                CDbl(reader("LiveHSAV")),
+                                CDbl(reader("LiveWSAV")),
+                                CDbl(reader("Depth")),
+                                CDbl(reader("XtMoist")),
+                                CDbl(reader("DHt")),
+                                CDbl(reader("LHt")),
+                                reader("FMName").ToString(),
+                                reader("Creator").ToString()
+                            )
 
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-        Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
+                            colFM.Add(fmNewFM, "FM" & reader("FMNum").ToString())
+                        End While
 
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
 
-            MsgBox("Error in gr_MakeRuleset - " & ex.Message)
-        End Try
+                    End Using
+                End Using
+
+            Catch ex As Exception
+
+                MsgBox("Error in gr_MakeRuleset - " & ex.Message)
+
+            End Try
+        End Using
+
 
         'Create arrays for the x-values and the y-values
         Dim MFWArray() As Object = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12",
@@ -966,37 +925,32 @@ Public Class frmRule
             strROSFLCBH = "FL(ft)"
         End If
 
-        If rdoDM1.Checked Then
-            intFM01 = 3
-            intFM10 = 4
-            intFM100 = 5
-        ElseIf rdoDM2.Checked Then
-            intFM01 = 6
-            intFM10 = 7
-            intFM100 = 8
-        ElseIf rdoDM3.Checked Then
-            intFM01 = 9
-            intFM10 = 10
-            intFM100 = 11
-        ElseIf rdoDM4.Checked Then
-            intFM01 = 12
-            intFM10 = 13
-            intFM100 = 14
+
+        Dim values As Integer() = Nothing
+
+        If rdoDM1.Checked Then values = {3, 4, 5}
+        If rdoDM2.Checked Then values = {6, 7, 8}
+        If rdoDM3.Checked Then values = {9, 10, 11}
+        If rdoDM4.Checked Then values = {12, 13, 14}
+
+        If values IsNot Nothing Then
+            intFM01 = values(0)
+            intFM10 = values(1)
+            intFM100 = values(2)
         End If
 
-        If rdoLM1.Checked Then
-            intLH = 30
-            intLW = 60
-        ElseIf rdoLM2.Checked Then
-            intLH = 60
-            intLW = 90
-        ElseIf rdoLM3.Checked Then
-            intLH = 90
-            intLW = 120
-        ElseIf rdoLM4.Checked Then
-            intLH = 120
-            intLW = 150
+        Dim values2 As Integer() = Nothing
+
+        If rdoLM1.Checked Then values2 = {30, 60}
+        If rdoLM2.Checked Then values2 = {60, 90}
+        If rdoLM3.Checked Then values2 = {90, 120}
+        If rdoLM4.Checked Then values2 = {120, 150}
+
+        If values2 IsNot Nothing Then
+            intLH = values2(0)
+            intLW = values2(1)
         End If
+
 
         Dim seriesArray(20) As Object 'This holds the values of ROS or FL by MFWS for the yaxis
 
@@ -1255,16 +1209,37 @@ Public Class frmRule
         chrtCompFM.Legends.Add("Fire Behavior")
     End Sub
 
+    ' Emulates Access/VBA banker’s rounding exactly (Round(x,0)).
+    ' SQLite ROUND(x) does not match Access in half-even cases.
+    Public Function AccessRound(value As Double) As Double
+        ' Banker's rounding: halves go to nearest even number
+        Dim floorVal As Double = Math.Floor(value)
+        Dim diff As Double = value - floorVal
+
+        If diff = 0.5 Then
+            ' exactly .5 → round to even
+            If floorVal Mod 2 = 0 Then
+                Return floorVal
+            Else
+                Return floorVal + 1
+            End If
+        Else
+            ' normal rounding
+            Return Math.Round(value)
+        End If
+    End Function
+
     Private Sub DistGraph()
         Dim rnd As New Random                                           'Used to set a random color
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
-        Dim rs2 As New ADODB.Recordset                                  'recordset for data
+        Dim cmd1 As SQLiteCommand                                       'command for rs1 data
+        Dim cmd2 As SQLiteCommand                                       'command for rs2 data
+        Dim rs1 As SQLiteDataReader                                     'reader for data
+        Dim rs2 As SQLiteDataReader                                     'reader for data
 
         Dim err As String = ""                                          'Used to store any errors that occur   
 
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
+        Dim dbconn As New SQLiteConnection("Data Source=" &
+        strProjectPath & "\" & gs_LFTFCSQliteName & ";")                    'DB connection
         dbconn.Open()
 
 
@@ -1305,40 +1280,49 @@ Public Class frmRule
                      "FROM LUT_Height " &
                      "GROUP BY LUT_Height.Lifeform " &
                      "HAVING (((LUT_Height.Lifeform)='Tree'))"
-            rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+            cmd1 = New SQLiteCommand(strSQL, dbconn)
+            rs1 = cmd1.ExecuteReader()
 
-            If rs1.EOF = False Then
-                treeCounter = CInt(rs1.Fields!CountOfLifeform.Value)
+            If rs1.Read() Then
+                treeCounter = CInt(rs1("CountOfLifeform"))
             End If
             rs1.Close()
+            cmd1.Dispose()
 
             strSQL = "SELECT LUT_Height.Lifeform, LUT_Height.LowName, LUT_Height.HighName, LUT_Height.EVH " &
                      "FROM LUT_Height " &
                      "WHERE(((LUT_Height.EVH) > 100)) " &
                      "ORDER BY LUT_Height.EVH"
-            rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+
+            'SQLiteDataReader has no RecordCount, get the row count first for array sizing
+            cmd1 = New SQLiteCommand("SELECT Count(*) FROM LUT_Height WHERE LUT_Height.EVH > 100", dbconn)
+            Dim evhRowCount As Integer = CInt(cmd1.ExecuteScalar())
+            cmd1.Dispose()
+
+            cmd1 = New SQLiteCommand(strSQL, dbconn)
+            rs1 = cmd1.ExecuteReader()
 
             itemCounter = 1
 
-            Dim hgtArray(CInt(rs1.RecordCount) + treeCounter) As Object
+            Dim hgtArray(evhRowCount + treeCounter) As Object
 
-            Do While rs1.EOF() <> True
-                If rs1.Fields!Lifeform.Value.ToString = "Tree" Then
+            Do While rs1.Read()
+                If rs1("Lifeform").ToString = "Tree" Then
                     'Canopy
-                    hgtArray(itemCounter) = Mid(rs1.Fields!LowName.Value.ToString, 1, Len(rs1.Fields!LowName.Value) - 1) &
-                                                        Trim(Mid(rs1.Fields!HighName.Value.ToString, 1, Len(rs1.Fields!HighName.Value) - 5))
-                    hgtArray(itemCounter + treeCounter) = Mid(rs1.Fields!LowName.Value.ToString, 1, Len(rs1.Fields!LowName.Value) - 1) &
-                                                        Trim(Mid(rs1.Fields!HighName.Value.ToString, 1, Len(rs1.Fields!HighName.Value) - 5))
+                    hgtArray(itemCounter) = Mid(rs1("LowName").ToString, 1, Len(rs1("LowName")) - 1) &
+                                                        Trim(Mid(rs1("HighName").ToString, 1, Len(rs1("HighName")) - 5))
+                    hgtArray(itemCounter + treeCounter) = Mid(rs1("LowName").ToString, 1, Len(rs1("LowName")) - 1) &
+                                                        Trim(Mid(rs1("HighName").ToString, 1, Len(rs1("HighName")) - 5))
                 Else
                     'No Canopy
-                    hgtArray(itemCounter) = Mid(rs1.Fields!LowName.Value.ToString, 1, Len(rs1.Fields!LowName.Value) - 1) &
-                                                        Trim(Mid(rs1.Fields!HighName.Value.ToString, 1, Len(rs1.Fields!HighName.Value) - 5))
+                    hgtArray(itemCounter) = Mid(rs1("LowName").ToString, 1, Len(rs1("LowName")) - 1) &
+                                                        Trim(Mid(rs1("HighName").ToString, 1, Len(rs1("HighName")) - 5))
                 End If
                 itemCounter += 1
-                rs1.MoveNext()
             Loop
 
             rs1.Close()
+            cmd1.Dispose()
             'This holds the values of acres by cover class for the yaxis plus 2 space holders
             Dim seriesArray(covArray.Length - 1) As Object
 
@@ -1355,7 +1339,9 @@ Public Class frmRule
                 "FROM LUT_Height " &
                 "WHERE(((LUT_Height.EVH) > 100)) " &
                 "ORDER BY LUT_Height.EVH"
-            rs2.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+            cmd2 = New SQLiteCommand(strSQL, dbconn)
+            rs2 = cmd2.ExecuteReader()
+            Dim rs2HasRow As Boolean = rs2.Read()   'Position on first row (reader has no non-advancing "current row")
 
             Do While hA <= hgtArray.Length - treeCounter - 1 'All the height + additional for canopy
                 Dim cA As Short
@@ -1364,52 +1350,53 @@ Public Class frmRule
                     seriesArray(cA) = "0"
                 Next
 
-                evhCode = CInt(rs2.Fields!EVH.Value) 'Set next evh code
+                evhCode = CInt(rs2("EVH")) 'Set next evh code
 
                 If IsNumeric(gf_GetNum(cmbBPSGraph.SelectedItem.ToString, "General")) Then 'BPS is numeric not 'any'
                     strSQL = "SELECT LUT_Height.Lifeform, " & comboR & ".EVHR, " & comboR & ".EVCR, " &
-                    "Sum(IIf(((" & comboR & ".EVTR=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "EVT") & ") " &
+                    "Sum(CASE WHEN ((" & comboR & ".EVTR=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "EVT") & ") " &
                     "And (" & comboR & ".DIST=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST") & ") " &
                     "And (" & comboR & ".BPSRF = " & gf_GetNum(cmbBPSGraph.SelectedItem.ToString, "General") & ") " &
-                    "And (" & comboR & ".Wildcard = '" & cmbWildGraph.SelectedItem.ToString & "')) " &
+                    "And (" & comboR & ".WILDCARD = '" & cmbWildGraph.SelectedItem.ToString & "')) " &
                     "Or ((" & comboR & ".EVTR=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "EVT") & ") " &
                     "And (" & comboR & ".DIST=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST") & ") " &
                     "And (" & comboR & ".BPSRF = " & gf_GetNum(cmbBPSGraph.SelectedItem.ToString, "General") & ") " &
-                    "And ('" & cmbWildGraph.SelectedItem.ToString & "' = 'any')), " &
-                    "Round(" & comboR & ".COUNT * 0.2223948,0),0)) AS SUMCOUNT " &
-                    "FROM (LUT_Cover Inner JOIN " & comboR & " ON LUT_Cover.EVC = " & comboR & ".EVCR) " &
+                    "And ('" & cmbWildGraph.SelectedItem.ToString & "' = 'any')) " &
+                    "THEN ROUND(" & comboR & ".""COUNT"" * 0.2223948) ELSE 0 END) AS SUMCOUNT " &
+                    "FROM (LUT_Cover INNER JOIN " & comboR & " ON LUT_Cover.EVC = " & comboR & ".EVCR) " &
                     "INNER JOIN LUT_Height ON " & comboR & ".EVHR = LUT_Height.EVH " &
                     "GROUP BY LUT_Height.Lifeform, " & comboR & ".EVHR, " & comboR & ".EVCR " &
                     "HAVING(((" & comboR & ".EVHR) = " & evhCode & ") And ((" & comboR & ".EVCR) > 100)) " &
                     "ORDER BY " & comboR & ".EVCR"
                 Else 'BPS is text it is 'any'
                     strSQL = "SELECT LUT_Height.Lifeform, " & comboR & ".EVHR, " & comboR & ".EVCR, " &
-                    "Sum(IIf(((" & comboR & ".EVTR=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "EVT") & ") " &
+                    "Sum(CASE WHEN ((" & comboR & ".EVTR=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "EVT") & ") " &
                     "And (" & comboR & ".DIST=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST") & ") " &
-                    "And (" & comboR & ".Wildcard = '" & cmbWildGraph.SelectedItem.ToString & "')) " &
+                    "And (" & comboR & ".WILDCARD = '" & cmbWildGraph.SelectedItem.ToString & "')) " &
                     "Or ((" & comboR & ".EVTR=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "EVT") & ") " &
                     "And (" & comboR & ".DIST=" & gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST") & ") " &
-                    "And ('" & cmbWildGraph.SelectedItem.ToString & "' = 'any')), " &
-                    "Round(" & comboR & ".COUNT*0.2223948,0),0)) AS SUMCOUNT " &
-                    "FROM (LUT_Cover Inner JOIN " & comboR & " ON LUT_Cover.EVC = " & comboR & ".EVCR) " &
+                    "And ('" & cmbWildGraph.SelectedItem.ToString & "' = 'any')) " &
+                    "THEN ROUND(" & comboR & ".""COUNT"" * 0.2223948) ELSE 0 END) AS SUMCOUNT " &
+                    "FROM (LUT_Cover INNER JOIN " & comboR & " ON LUT_Cover.EVC = " & comboR & ".EVCR) " &
                     "INNER JOIN LUT_Height ON " & comboR & ".EVHR = LUT_Height.EVH " &
                     "GROUP BY LUT_Height.Lifeform, " & comboR & ".EVHR, " & comboR & ".EVCR " &
                     "HAVING(((" & comboR & ".EVHR) = " & evhCode & ") And ((" & comboR & ".EVCR) > 100)) " &
                     "ORDER BY " & comboR & ".EVCR"
                 End If
 
-                rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                cmd1 = New SQLiteCommand(strSQL, dbconn)
+                rs1 = cmd1.ExecuteReader()
 
                 'Run three times per query
                 Dim acreCheck As Boolean = False    'True if acres are present False if not
                 cA = 1                              'Keeps track of what number is added to the series
-                Do Until rs1.EOF
-                    seriesArray(cA) = rs1.Fields!SUMCOUNT.Value
+                Do While rs1.Read()
+                    seriesArray(cA) = AccessRound(CDbl(rs1("SUMCOUNT")))
                     If CInt(seriesArray(cA)) > 0 Then acreCheck = True
                     cA += CShort(1)
-                    rs1.MoveNext()
                 Loop
                 rs1.Close()
+                cmd1.Dispose()
 
                 'Add a series to the chart with the x-values and y-values
                 'from the arrays and set the series type to a column chart
@@ -1437,7 +1424,7 @@ Public Class frmRule
                         End With
 
                         'Get canopy values for the series
-                    ElseIf rs2.Fields!Lifeform.Value.ToString = "Tree" And rdoNoneDistGraph.Checked <> True Then
+                    ElseIf rs2("Lifeform").ToString = "Tree" And rdoNoneDistGraph.Checked <> True Then
                         Dim distCC As Double                  'Stores the disturbed Canopy Cover
                         Dim distCH As Double                  'Stores the disturbed Canopy Height
 
@@ -1447,17 +1434,19 @@ Public Class frmRule
                         "FROM LUT_Cover " &
                         "WHERE(((LUT_Cover.Lifeform) = 'Tree')) " &
                         "ORDER BY LUT_Cover.EVC"
-                        rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                        cmd1 = New SQLiteCommand(strSQL, dbconn)
+                        rs1 = cmd1.ExecuteReader()
+                        Dim rs1HasRow As Boolean = rs1.Read()   'Position on first row
 
-                        Do Until rs1.EOF
+                        Do While rs1HasRow
                             Application.DoEvents() 'Allow form to update while loop is running
                             Try
                                 'Get disturbed CC and CH if disturbed
                                 If CInt(gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST")) > 0 Then
-                                    distCC = Canopy_LM_EQs(CShort((CInt(rs1.Fields!EVC.Value) - 100) * 10 + 5),
+                                    distCC = Canopy_LM_EQs(CShort((CInt(rs1("EVC")) - 100) * 10 + 5),
                                                 evhMidPoint / 10, CShort(gf_GetNum(cmbEVT.SelectedItem.ToString, "EVT")),
                                                 CShort(gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST")), "Cover")
-                                    distCH = Canopy_LM_EQs(CShort((CInt(rs1.Fields!EVC.Value) - 100) * 10 + 5),
+                                    distCH = Canopy_LM_EQs(CShort((CInt(rs1("EVC")) - 100) * 10 + 5),
                                                            evhMidPoint / 10, CShort(gf_GetNum(cmbEVT.SelectedItem.ToString, "EVT")),
                                                            CShort(gf_GetNum(cmbEVT.SelectedItem.ToString, "DIST")), "Height")
                                     If distCC < 10 Or distCH <= 1.8 Then
@@ -1466,7 +1455,7 @@ Public Class frmRule
                                     End If
                                 Else
                                     'Get non disturbed CC and CH
-                                    distCC = (CDbl(rs1.Fields!EVC.Value) - 100) * 10 + 5
+                                    distCC = (CDbl(rs1("EVC")) - 100) * 10 + 5
                                     distCH = evhMidPoint / 10
                                 End If
 
@@ -1488,13 +1477,13 @@ Public Class frmRule
                                 End If
 
                                 cA += CShort(1)
-                                If rs1.EOF = False Then rs1.MoveNext()
+                                If rs1HasRow Then rs1HasRow = rs1.Read()
                                 retryCount = 0 'Reset retry count for next record
                             Catch ex As Exception
                                 If retryCount > 5000 Then
                                     seriesArray(cA) = 0 'Set value to 0 if there is an error to avoid infinite loop
                                     cA += CShort(1)
-                                    If rs1.EOF = False Then rs1.MoveNext()
+                                    If rs1HasRow Then rs1HasRow = rs1.Read()
                                 Else
                                     retryCount += 1
                                 End If
@@ -1530,14 +1519,16 @@ Public Class frmRule
                         End With
                         Series1Index = chrtDist.Series.Count - 1                                        'Get starting count before adding CBH and CBD series
                         rs1.Close()
+                        cmd1.Dispose()
                     End If
                 End If
                 hA += 1
 
-                If rs2.EOF = False Then rs2.MoveNext()
+                If rs2HasRow Then rs2HasRow = rs2.Read()
                 'Debug.Print("hA = " & hA)
             Loop
             rs2.Close()
+            cmd2.Dispose()
             chrtDist.Refresh()
 
             If rdoNoneDistGraph.Checked <> True Then                                                    'Set colors for CBH or CBD
@@ -1561,20 +1552,24 @@ Public Class frmRule
                 End If
             End If
 
-            If rs1.State <> 0 Then rs1.Close()
+            If rs1 IsNot Nothing AndAlso Not rs1.IsClosed Then rs1.Close()
             rs1 = Nothing
+            If cmd1 IsNot Nothing Then cmd1.Dispose()
 
-            If rs2.State <> 0 Then rs2.Close()
+            If rs2 IsNot Nothing AndAlso Not rs2.IsClosed Then rs2.Close()
             rs2 = Nothing
+            If cmd2 IsNot Nothing Then cmd2.Dispose()
 
             If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
             dbconn = Nothing
         Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
+            If rs1 IsNot Nothing AndAlso Not rs1.IsClosed Then rs1.Close()
             rs1 = Nothing
+            If cmd1 IsNot Nothing Then cmd1.Dispose()
 
-            If rs2.State <> 0 Then rs2.Close()
+            If rs2 IsNot Nothing AndAlso Not rs2.IsClosed Then rs2.Close()
             rs2 = Nothing
+            If cmd2 IsNot Nothing Then cmd2.Dispose()
 
             If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
             dbconn = Nothing
@@ -1582,70 +1577,94 @@ Public Class frmRule
         End Try
     End Sub
 
+    Private Function AdjustCBH(value As Double, numCH As Double) As Double
+        Dim rounded = Math.Round(value, 1)
+
+        If rounded < 0.3 Then Return 0.3
+        If rounded >= 10 Then Return 10
+        If rounded >= numCH Then Return numCH * 0.6666
+        Return rounded
+    End Function
+
+    Private Function AdjustCover(value As Double, numCC As Double, numDist As Short) As Double
+        If numDist = 0 Then Return numCC
+
+        Dim rounded = Math.Round(value, 0)
+        If rounded < 10 Then Return 0
+        If rounded > 95 Then Return 95
+        Return rounded
+    End Function
+
+    Private Function AdjustHeight(value As Double, numCH As Double, numDist As Short) As Double
+        If numDist = 0 Then Return numCH
+
+        Dim rounded = Math.Round(value, 1)
+        If rounded < 1.3 Then Return 0
+        If rounded >= 50 Then Return 50
+        Return rounded
+    End Function
+
     Private Function Canopy_LM_EQs(ByVal numCC As Double, ByVal numCH As Double, ByVal numEVT As Short,
                                    ByVal numDist As Short, ByVal canopyType As String) As Double
-        Dim dbconn As New ADODB.Connection                               'DB connection
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
 
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+        Dim connString As String = "Data Source=" & strProjectPath & "\" & gs_LFTFCSQliteName
+        Dim result As Double = 0
 
         Try
-            'Get the equation for the specified coefficients
-            strSQL = "Select Tree_EVTs, HDist, intercept, HT_coef, CC_coef, EV_Structure " &
-                     "FROM Master_Disturbance_Tbl " &
-                     "WHERE (((Tree_EVTs)= " & numEVT & ") " &
-                     "And ((HDist)= " & numDist & ") And " &
-                     "((EV_Structure)='" & canopyType & "'))"
-            rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+            Dim intercept As Double = 0
+            Dim htCoef As Double = 0
+            Dim ccCoef As Double = 0
 
-            Canopy_LM_EQs = CDbl(rs1.Fields!intercept.Value) + (CDbl(rs1.Fields!HT_coef.Value) * (numCH)) + (CDbl(rs1.Fields!CC_coef.Value) * numCC)
+            Using conn As New SQLite.SQLiteConnection(connString)
+                conn.Open()
 
-            rs1.Close()
+                Using cmd As New SQLite.SQLiteCommand("
+                SELECT intercept, HT_coef, CC_coef
+                FROM Master_Disturbance_Tbl
+                WHERE Tree_EVTs = @evt
+                  AND HDist = @dist
+                  AND EV_Structure = @struct;", conn)
 
-            If canopyType = "CBH" And Math.Round(Canopy_LM_EQs, 1) < 0.3 Then
-                Canopy_LM_EQs = 0.3
-            ElseIf canopyType = "CBH" And Math.Round(Canopy_LM_EQs, 1) >= 10 Then
-                Canopy_LM_EQs = 10
-            ElseIf canopyType = "CBH" And Math.Round(Canopy_LM_EQs, 1) >= numCH Then
-                Canopy_LM_EQs = numCH * 0.6666
-            ElseIf canopyType = "CBH" Then
-                Canopy_LM_EQs = Math.Round(Canopy_LM_EQs, 1)
-            End If
+                    cmd.Parameters.AddWithValue("@evt", numEVT)
+                    cmd.Parameters.AddWithValue("@dist", numDist)
+                    cmd.Parameters.AddWithValue("@struct", canopyType)
 
-            If canopyType = "Cover" And numDist = 0 Then
-                Canopy_LM_EQs = numCC
-            ElseIf canopyType = "Cover" And Math.Round(Canopy_LM_EQs, 0) < 10 Then
-                Canopy_LM_EQs = 0
-            ElseIf canopyType = "Cover" And Math.Round(Canopy_LM_EQs, 0) > 95 Then
-                Canopy_LM_EQs = 95
-            ElseIf canopyType = "Cover" Then
-                Canopy_LM_EQs = Math.Round(Canopy_LM_EQs, 0)
-            End If
+                    Using reader = cmd.ExecuteReader()
+                        If reader.Read() Then
+                            intercept = CDbl(reader("intercept"))
+                            htCoef = CDbl(reader("HT_coef"))
+                            ccCoef = CDbl(reader("CC_coef"))
+                        Else
+                            Return 0   ' No record; original function implicitly returned 0 on missing data
+                        End If
+                    End Using
 
-            If canopyType = "Height" And numDist = 0 Then
-                Canopy_LM_EQs = numCH
-            ElseIf canopyType = "Height" And Math.Round(Canopy_LM_EQs, 1) < 1.3 Then
-                Canopy_LM_EQs = 0
-            ElseIf canopyType = "Height" And Math.Round(Canopy_LM_EQs, 1) >= 50 Then
-                Canopy_LM_EQs = 50
-            ElseIf canopyType = "Height" Then
-                Canopy_LM_EQs = Math.Round(Canopy_LM_EQs, 1)
-            End If
+                End Using
+            End Using
 
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
+            ' Base computed equation
+            result = intercept + (htCoef * numCH) + (ccCoef * numCC)
+
+            ' Apply canopy-type specific adjustments
+            Select Case canopyType
+                Case "CBH"
+                    result = AdjustCBH(result, numCH)
+
+                Case "Cover"
+                    result = AdjustCover(result, numCC, numDist)
+
+                Case "Height"
+                    result = AdjustHeight(result, numCH, numDist)
+
+            End Select
+
+            Return result
+
         Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-
-            If dbconn.State <> ConnectionState.Closed Then                                 'Database needs to be closed
-                dbconn = Nothing
-            End If
-
             MsgBox("Error in Canopy_LM_EQs - " & ex.Message)
+            Return 0
         End Try
+
     End Function
 
     Private Function CalcCBDGLM(ByVal CCMidpoint As Double, ByVal CHMidPoint As Double) As Integer
@@ -2121,299 +2140,258 @@ Public Class frmRule
 
     End Sub
 
-    Private Sub cmbDefaultFM_SelectedIndexChanged(ByVal sender As Object, ByVal e As EventArgs) Handles cmbDefaultFM.SelectedIndexChanged
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
-
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+    Private Sub cmbDefaultFM_SelectedIndexChanged(ByVal sender As Object, ByVal e As System.EventArgs) Handles cmbDefaultFM.SelectedIndexChanged
 
         Try
-            Dim strFMType As String
+            Using conn As New SQLiteConnection("Data Source=" & strProjectPath & "\" & gs_LFTFCSQliteName)
+                conn.Open()
 
-            'Populate starting values of parameters
-            strSQL = "SELECT FMNum, FMCode, FL1H, FL10H, FL100H, FLLiveH, FLLiveW, FMType, H1SAV, LiveHSAV, LiveWSAV, " &
-                     "Depth, XtMoist, DHt, LHt, FMName " &
-                     "FROM LUT_FuelModelParameters " &
-                     "WHERE FMNum = " & cmbDefaultFM.Text
-            rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                Dim strFMType As String = ""
 
-            rdo1H.Text = Math.Round(rs1.Fields!FL1H.Value, 2)
-            rdo10H.Text = Math.Round(rs1.Fields!FL10H.Value, 2)
-            rdo100H.Text = Math.Round(rs1.Fields!FL100H.Value, 2)
-            rdoLiveH.Text = Math.Round(rs1.Fields!FLLiveH.Value, 2)
-            rdoLiveW.Text = Math.Round(rs1.Fields!FLLiveW.Value, 2)
-            rdo1HSAV.Text = rs1.Fields!H1SAV.Value
-            rdoLiveHSAV.Text = rs1.Fields!LiveHSAV.Value
-            rdoLiveWSAV.Text = rs1.Fields!LiveWSAV.Value
-            rdoDepth.Text = Math.Round(rs1.Fields!Depth.Value, 2)
-            rdoXtMoist.Text = rs1.Fields!XtMoist.Value
+                '-----------------------------------------
+                ' Retrieve starting FM parameters
+                '-----------------------------------------
+                Dim sql As String =
+                "SELECT FMNum, FMCode, FL1H, FL10H, FL100H, FLLiveH, FLLiveW, FMType, " &
+                "H1SAV, LiveHSAV, LiveWSAV, Depth, XtMoist, DHt, LHt, FMName " &
+                "FROM LUT_FuelModelParameters " &
+                "WHERE FMNum = @fmnum"
 
-            strFMType = rs1.Fields!FMType.Value 'Save the value before closeing. 
+                Using cmd As New SQLiteCommand(sql, conn)
+                    cmd.Parameters.AddWithValue("@fmnum", CInt(cmbDefaultFM.Text))
 
-            'Close before making change that might fire a new event that accesses the database
-            'dbDAO.Close()
-            'dbDAO = Nothing
+                    Using reader As SQLiteDataReader = cmd.ExecuteReader()
+                        If reader.Read() Then
 
-            If strFMType = "dynamic" Then
-                chkFMType.Checked = True
-            Else
-                chkFMType.Checked = False
-            End If
+                            '-----------------------------------------
+                            ' Assign values
+                            '-----------------------------------------
+                            rdo1H.Text = Math.Round(CDbl(reader("FL1H")), 2)
+                            rdo10H.Text = Math.Round(CDbl(reader("FL10H")), 2)
+                            rdo100H.Text = Math.Round(CDbl(reader("FL100H")), 2)
+                            rdoLiveH.Text = Math.Round(CDbl(reader("FLLiveH")), 2)
+                            rdoLiveW.Text = Math.Round(CDbl(reader("FLLiveW")), 2)
 
-            rdo1H.Checked = True
+                            rdo1HSAV.Text = reader("H1SAV").ToString()
+                            rdoLiveHSAV.Text = reader("LiveHSAV").ToString()
+                            rdoLiveWSAV.Text = reader("LiveWSAV").ToString()
 
-            With TrkBar
-                .Minimum = 0
-                .Maximum = 701
-                .Value = rdo1H.Text * 100
-                .TickFrequency = 35
-            End With
+                            rdoDepth.Text = Math.Round(CDbl(reader("Depth")), 2)
+                            rdoXtMoist.Text = reader("XtMoist").ToString()
 
-            If TabControl.SelectedIndex = 1 Then GraphCompareFM()
+                            strFMType = reader("FMType").ToString()
 
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
+                        Else
+                            ' If record not found: do nothing
+                            Exit Sub
+                        End If
+                    End Using
+                End Using
 
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
+                '-----------------------------------------
+                ' FMType → checkbox flag
+                '-----------------------------------------
+                If strFMType = "dynamic" Then
+                    chkFMType.Checked = True
+                Else
+                    chkFMType.Checked = False
+                End If
+
+                '-----------------------------------------
+                ' UI state exactly as original
+                '-----------------------------------------
+                rdo1H.Checked = True
+
+                With TrkBar
+                    .Minimum = 0
+                    .Maximum = 701
+                    .Value = CInt(CDbl(rdo1H.Text) * 100)
+                    .TickFrequency = 35
+                End With
+
+                ' Fire graph if correct tab is selected
+                If TabControl.SelectedIndex = 1 Then
+                    GraphCompareFM()
+                End If
+
+            End Using
+
         Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-            MsgBox("Error in cmbFMStart_SelectedIndexChanged - " & ex.Message)
+            MsgBox("Error in cmbDefaultFM_SelectedIndexChanged - " & ex.Message)
         End Try
 
     End Sub
 
     Private Sub cmdSaveCSTFM_Click(ByVal sender As Object, ByVal e As EventArgs)
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
-
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
 
         Try
-            Dim strNewFMNum As String 'Stores the newly entered fuel model number
-            Dim strNewFMName As String 'Stores the newly entered fuel model name
-            Dim strNotAvail As String  'Fuel model already used
-            Dim blnGood As Boolean  'Marks if the number is good or not
-            Dim strError As String      'Stores why the new number is bad
-            blnGood = False
-            strNewFMName = "nothing"
-            strNewFMNum = "nothing"
-            strError = ""
-            strNotAvail = ""
+            Using conn As New SQLiteConnection("Data Source=" & strProjectPath & "\" & gs_LFTFCSQliteName)
+                conn.Open()
 
-            strSQL = "SELECT FMNum " &
-                     "FROM LUT_FuelModelParameters " &
-                     "Order by FMNum"
-            rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                Dim strNewFMNum As String = ""
+                Dim strNewFMName As String = ""
+                Dim strNotAvail As String = ""
+                Dim blnGood As Boolean = False
+                Dim strError As String = ""
 
-            Do While rs1.EOF = False
-                strNotAvail = strNotAvail & ", " & rs1.Fields!FMNum.Value
-                rs1.MoveNext()
-            Loop
+                '----------------------------------------------------------
+                ' Load all existing FMNum values
+                '----------------------------------------------------------
+                Dim existingNums As New List(Of Integer)
 
-            Do While blnGood = False
-                'Get new Fuel Model Number from the user
-                rs1.MovePrevious()
-                strNewFMNum = InputBox("Input a new 3 digit or less Custom Fuel Model number. " &
-                         "Do not use Anderson 13 or Scott and Burgan existing Fuel Model Numbers. " &
-                         "These numbers are already in use: " & strNotAvail, "New Custom FM Number",
-                         Str(rs1.Fields!FMNum.Value + 1))
+                Dim sqlLoad As String = "SELECT FMNum FROM LUT_FuelModelParameters ORDER BY FMNum"
+                Using cmd As New SQLiteCommand(sqlLoad, conn)
+                    Using rd As SQLiteDataReader = cmd.ExecuteReader()
+                        While rd.Read()
+                            existingNums.Add(CInt(rd("FMNum")))
+                        End While
+                    End Using
+                End Using
 
-                'Check for bad number
-                blnGood = True
-                If IsNumeric(strNewFMNum) = False Then
-                    blnGood = False
-                    strError = "Error: " & strNewFMNum & " is not a number."
-                ElseIf strNewFMNum > 1000 Or strNewFMNum < 0 Then
-                    blnGood = False
-                    strError = "Error: " & strNewFMNum & " is either < 0 OR > 999."
-                End If
+                ' Build "not available" message
+                For Each n In existingNums
+                    strNotAvail &= ", " & n.ToString()
+                Next
 
-                rs1.MoveFirst()
+                '----------------------------------------------------------
+                ' Loop until user provides a valid FM number
+                '----------------------------------------------------------
+                Do While blnGood = False
 
-                Do While rs1.EOF = False And blnGood = True
+                    ' Default suggestion from last FMNum
+                    Dim suggestion As String = (existingNums.LastOrDefault() + 1).ToString()
 
-                    If Int(strNewFMNum) = rs1.Fields!FMNum.Value Then
+                    strNewFMNum = InputBox(
+                    "Input a new 3 digit or less Custom Fuel Model number. " &
+                    "Do not use Anderson 13 or Scott and Burgan existing Fuel Model Numbers. " &
+                    "These numbers are already in use: " & strNotAvail,
+                    "New Custom FM Number",
+                    suggestion)
+
+                    If strNewFMNum = "" Then Exit Sub      ' cancel pressed
+
+                    blnGood = True     ' prove false
+
+                    If Not IsNumeric(strNewFMNum) Then
                         blnGood = False
-                        strError = "Error: " & strNewFMNum & " =  an existing Fuel Model Number."
+                        strError = "Error: " & strNewFMNum & " is not a number."
+                    ElseIf CInt(strNewFMNum) < 0 Or CInt(strNewFMNum) > 999 Then
+                        blnGood = False
+                        strError = "Error: " & strNewFMNum & " is either < 0 OR > 999."
+                    Else
+                        ' conflict with existing FMNum?
+                        For Each n In existingNums
+                            If CInt(strNewFMNum) = n Then
+                                blnGood = False
+                                strError = "Error: " & strNewFMNum & " = an existing Fuel Model Number."
+                                Exit For
+                            End If
+                        Next
                     End If
 
-                    rs1.MoveNext()
+                    If blnGood = False Then MsgBox(strError, , "Bad Fuel Model Number")
+
                 Loop
-                rs1.Close()
 
-                'If blnGood is false let the user know why it is false
-                If blnGood = False Then MsgBox(strError, , "Bad Fuel Model Number")
-                If strNewFMNum = "" Then Exit Sub 'Cancel was pushed
-            Loop
+                '----------------------------------------------------------
+                ' Loop until user provides a valid FM Name
+                '----------------------------------------------------------
+                blnGood = False
+                Do While blnGood = False
 
-            'Get a new fuel model name
-            blnGood = False 'False unless proven true
-            Do While blnGood = False
-                blnGood = True
-                strNewFMName = InputBox("Input a new fuel model name less than 255 characters " &
-                                        "long that describes the custom fuel model.",
-                                        "New Custom FM Code", "ABC")
-                If strNewFMName.Length = 0 Then
-                    strError = "Enter a Name 255 characters or less."
-                    blnGood = False
-                ElseIf strNewFMName.Length > 255 Then
-                    strError = strNewFMName & "is longer than 255 characters."
-                    blnGood = False
-                End If
+                    strNewFMName = InputBox(
+                    "Input a new fuel model name less than 255 characters " &
+                    "long that describes the custom fuel model.",
+                    "New Custom FM Code",
+                    "ABC")
 
-                'If blnGood is false let the user know why it is false
+                    If strNewFMName = "" Then Exit Sub    ' cancel pressed
 
-                If blnGood = False Then MsgBox(strError, , "Bad Fuel Model Number")
-                If strNewFMName = "" Then Exit Sub 'Cancel was pushed
-            Loop
+                    blnGood = True
 
-            strSQL = "INSERT INTO LUT_FuelModelParameters (FMNum, FMCode, FL1H, FL10H, FL100H, FLLiveH, FLLiveW, " &
-                     "FMType, H1SAV, LiveHSAV, LiveWSAV, Depth, XtMoist, DHt, LHt, FMName, DataType, Creator) " &
-                            "VALUES ( " & strNewFMNum & ", " &
-                            "'CST', " &
-                            rdo1H.Text & ", " &
-                            rdo10H.Text & ", " &
-                            rdo100H.Text & ", " &
-                            rdoLiveH.Text & ", " &
-                            rdoLiveW.Text & ", '" &
-                            chkFMType.Text & "', " &
-                            rdo1HSAV.Text & ", " &
-                            rdoLiveHSAV.Text & ", " &
-                            rdoLiveWSAV.Text & ", " &
-                            rdoDepth.Text & ", " &
-                            rdoXtMoist.Text & ", " &
-                            "8000, " &
-                            "8000, '" &
-                            strNewFMName & "', " &
-                            "'English', " &
-                            "'Custom')"
-            dbconn.Execute(strSQL)
+                    If strNewFMName.Length = 0 Then
+                        blnGood = False
+                        strError = "Enter a Name 255 characters or less."
+                    ElseIf strNewFMName.Length > 255 Then
+                        blnGood = False
+                        strError = strNewFMName & " is longer than 255 characters."
+                    End If
 
-            'Threading.Thread.Sleep(1000) 'Let the query catchup
-            System.Threading.Thread.Sleep(1000)
-            'Close the interface
-            cmdCustomFM.Text = "Custom" & vbCrLf & "FM"
-            grpCustFM.Visible = False
+                    If blnGood = False Then MsgBox(strError, , "Bad Fuel Model Number")
 
-            cmbFM1.Items.Clear()
-            cmbFM2.Items.Clear()
-            cmbFM3.Items.Clear()
-            cmbFM4.Items.Clear()
-            cmbDefaultFM.Items.Clear()
+                Loop
 
-            'Populate Compare Fuel Model comboboxs
-            cmbFM1.Items.Add("None")
-            cmbFM2.Items.Add("None")
-            cmbFM3.Items.Add("None")
-            cmbFM4.Items.Add("None")
+                '----------------------------------------------------------
+                ' INSERT new Fuel Model into LUT_FuelModelParameters
+                '----------------------------------------------------------
+                Dim sqlInsert As String =
+                "INSERT INTO LUT_FuelModelParameters (" &
+                "FMNum, FMCode, FL1H, FL10H, FL100H, FLLiveH, FLLiveW, FMType, " &
+                "H1SAV, LiveHSAV, LiveWSAV, Depth, XtMoist, DHt, LHt, FMName, " &
+                "DataType, Creator)" &
+                "VALUES (" &
+                "@FMNum, @FMCode, @FL1H, @FL10H, @FL100H, @FLLiveH, @FLLiveW, @FMType, " &
+                "@H1SAV, @LiveHSAV, @LiveWSAV, @Depth, @XtMoist, @DHt, @LHt, @FMName, " &
+                "@DataType, @Creator)"
 
-            strSQL = "SELECT FMNum " &
-                    "FROM LUT_FuelModelParameters " &
-                    "ORDER BY FMNum"
+                Using cmd As New SQLiteCommand(sqlInsert, conn)
 
-            gf_SetControl(cmbFM1, strSQL, strProjectPath)
-            gf_SetControl(cmbFM2, strSQL, strProjectPath)
-            gf_SetControl(cmbFM3, strSQL, strProjectPath)
-            gf_SetControl(cmbFM4, strSQL, strProjectPath)
+                    cmd.Parameters.AddWithValue("@FMNum", CInt(strNewFMNum))
+                    cmd.Parameters.AddWithValue("@FMCode", "CST")
 
-            'Populate starting Fuel Model combobox
-            strSQL = "SELECT FMNum " &
-                    "FROM LUT_FuelModelParameters " &
-                    "ORDER BY FMNum"
+                    cmd.Parameters.AddWithValue("@FL1H", CDbl(rdo1H.Text))
+                    cmd.Parameters.AddWithValue("@FL10H", CDbl(rdo10H.Text))
+                    cmd.Parameters.AddWithValue("@FL100H", CDbl(rdo100H.Text))
+                    cmd.Parameters.AddWithValue("@FLLiveH", CDbl(rdoLiveH.Text))
+                    cmd.Parameters.AddWithValue("@FLLiveW", CDbl(rdoLiveW.Text))
 
-            gf_SetControl(cmbDefaultFM, strSQL, strProjectPath)
+                    cmd.Parameters.AddWithValue("@FMType", chkFMType.Text)
 
-            cmbDefaultFM.SelectedIndex = 0
+                    cmd.Parameters.AddWithValue("@H1SAV", CInt(rdo1HSAV.Text))
+                    cmd.Parameters.AddWithValue("@LiveHSAV", CInt(rdoLiveHSAV.Text))
+                    cmd.Parameters.AddWithValue("@LiveWSAV", CInt(rdoLiveWSAV.Text))
 
-            cmbFM1.Text = "None"
-            cmbFM2.Text = "None"
-            cmbFM3.Text = "None"
-            cmbFM4.Text = "None"
+                    cmd.Parameters.AddWithValue("@Depth", CDbl(rdoDepth.Text))
+                    cmd.Parameters.AddWithValue("@XtMoist", CInt(rdoXtMoist.Text))
 
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
+                    cmd.Parameters.AddWithValue("@DHt", 8000)
+                    cmd.Parameters.AddWithValue("@LHt", 8000)
 
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-        Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
+                    cmd.Parameters.AddWithValue("@FMName", strNewFMName)
+                    cmd.Parameters.AddWithValue("@DataType", "English")
+                    cmd.Parameters.AddWithValue("@Creator", "Custom")
 
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-            MsgBox("Error in cmdSaveCSTFM_Click - " & ex.Message)
-        End Try
-    End Sub
+                    cmd.ExecuteNonQuery()
+                End Using
 
-    Private Sub cmdDelCstFM_Click(ByVal sender As Object, ByVal e As EventArgs)
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+                System.Threading.Thread.Sleep(1000)
 
-        Try
-            Dim strErrAnderson = "Error: Anderson 13 fuel models cannot be deleted"
-            Dim strErrNonBurnable = "Error: Default nonburnable fuel models cannot be deleted"
-            Dim strErrScottBurgan = "Error: Scott and Burgan fuel models cannot be deleted"
+                '----------------------------------------------------------
+                ' Reset UI exactly like original behavior
+                '----------------------------------------------------------
+                cmdCustomFM.Text = "Custom" & vbCrLf & "FM"
+                grpCustFM.Visible = False
 
-            If cmbDefaultFM.Text <= 13 Then
-                MsgBox("Error: Anderson 13 fuel models cannot be deleted")
-            ElseIf cmbDefaultFM.Text >= 91 And cmbDefaultFM.Text <= 93 Or
-                   cmbDefaultFM.Text >= 98 And cmbDefaultFM.Text <= 99 Then
-                MsgBox("Error: Default nonburnable fuel models cannot be deleted")
-            ElseIf cmbDefaultFM.Text >= 101 And cmbDefaultFM.Text <= 109 Or
-                   cmbDefaultFM.Text >= 121 And cmbDefaultFM.Text <= 124 Or
-                   cmbDefaultFM.Text >= 141 And cmbDefaultFM.Text <= 149 Or
-                   cmbDefaultFM.Text >= 161 And cmbDefaultFM.Text <= 165 Or
-                   cmbDefaultFM.Text >= 181 And cmbDefaultFM.Text <= 189 Or
-                   cmbDefaultFM.Text >= 201 And cmbDefaultFM.Text <= 204 Then
-                MsgBox("Error: Scott and Burgan fuel models cannot be deleted")
-            ElseIf MsgBox("Do you really want to delete fuel model " & cmbDefaultFM.Text & "." & vbCrLf,
-                          vbYesNo, "Delete Rule?") = vbYes Then
-
-                strSQL = "DELETE FROM LUT_FuelModelParameters " &
-                         "WHERE FMNum = " & cmbDefaultFM.Text
-                dbconn.Execute(strSQL)
-
-                Thread.Sleep(1000) 'Give the database a change to catchup
-
-                'Reset the comboxes
                 cmbFM1.Items.Clear()
                 cmbFM2.Items.Clear()
                 cmbFM3.Items.Clear()
                 cmbFM4.Items.Clear()
                 cmbDefaultFM.Items.Clear()
 
-                'Populate Compare Fuel Model comboboxs
                 cmbFM1.Items.Add("None")
                 cmbFM2.Items.Add("None")
                 cmbFM3.Items.Add("None")
-                cmbFM4.Items.Add("None")
+                cmbFM3.Items.Add("None")
 
-                strSQL = "SELECT FMNum " &
-                        "FROM LUT_FuelModelParameters " &
-                        "ORDER BY FMNum"
+                ' load back all FMNums into the compare FM combos
+                Dim sqlReload As String =
+                "SELECT FMNum FROM LUT_FuelModelParameters ORDER BY FMNum"
 
-                gf_SetControl(cmbFM1, strSQL, strProjectPath)
-                gf_SetControl(cmbFM2, strSQL, strProjectPath)
-                gf_SetControl(cmbFM3, strSQL, strProjectPath)
-                gf_SetControl(cmbFM4, strSQL, strProjectPath)
-
-                'Populate starting Fuel Model combobox
-                strSQL = "SELECT FMNum " &
-                        "FROM LUT_FuelModelParameters " &
-                        "ORDER BY FMNum"
-
-                gf_SetControl(cmbDefaultFM, strSQL, strProjectPath)
+                gf_SetControl(cmbFM1, sqlReload, strProjectPath)
+                gf_SetControl(cmbFM2, sqlReload, strProjectPath)
+                gf_SetControl(cmbFM3, sqlReload, strProjectPath)
+                gf_SetControl(cmbFM4, sqlReload, strProjectPath)
+                gf_SetControl(cmbDefaultFM, sqlReload, strProjectPath)
 
                 cmbDefaultFM.SelectedIndex = 0
 
@@ -2421,19 +2399,105 @@ Public Class frmRule
                 cmbFM2.Text = "None"
                 cmbFM3.Text = "None"
                 cmbFM4.Text = "None"
-            End If
 
-            If dbconn.State <> ConnectionState.Closed Then                                 'Database needs to be closed
-                dbconn = Nothing
-            End If
+            End Using
+
         Catch ex As Exception
-            If dbconn.State <> ConnectionState.Closed Then                                 'Database needs to be closed
-                dbconn = Nothing
-            End If
+            MsgBox("Error in cmdSaveCSTFM_Click - " & ex.Message)
+        End Try
 
+    End Sub
+
+    Private Sub cmdDelCstFM_Click(ByVal sender As Object, ByVal e As EventArgs) Handles cmdDelCstFM.Click
+
+        Try
+            Using conn As New SQLiteConnection("Data Source=" & strProjectPath & "\" & gs_LFTFCSQliteName)
+                conn.Open()
+
+                Dim fmNum As Integer = CInt(cmbDefaultFM.Text)
+
+                '---------------------------------------------------------
+                ' Protect Anderson 13, Nonburnable, Scott & Burgan models
+                '---------------------------------------------------------
+                If fmNum <= 13 Then
+                    MsgBox("Error: Anderson 13 fuel models cannot be deleted")
+                    Return
+
+                ElseIf (fmNum >= 91 And fmNum <= 93) Or
+                   (fmNum >= 98 And fmNum <= 99) Then
+                    MsgBox("Error: Default nonburnable fuel models cannot be deleted")
+                    Return
+
+                ElseIf (fmNum >= 101 And fmNum <= 109) Or
+                   (fmNum >= 121 And fmNum <= 124) Or
+                   (fmNum >= 141 And fmNum <= 149) Or
+                   (fmNum >= 161 And fmNum <= 165) Or
+                   (fmNum >= 181 And fmNum <= 189) Or
+                   (fmNum >= 201 And fmNum <= 204) Then
+                    MsgBox("Error: Scott and Burgan fuel models cannot be deleted")
+                    Return
+                End If
+
+                '---------------------------------------------------------
+                ' Confirmation prompt
+                '---------------------------------------------------------
+                If MsgBox("Do you really want to delete fuel model " & cmbDefaultFM.Text & "." & vbCrLf,
+                      vbYesNo, "Delete Rule?") <> vbYes Then
+                    Return
+                End If
+
+                '---------------------------------------------------------
+                ' Perform DELETE using SQLiteCommand
+                '---------------------------------------------------------
+                Dim sqlDelete As String =
+                "DELETE FROM LUT_FuelModelParameters WHERE FMNum = @fmnum"
+
+                Using cmd As New SQLiteCommand(sqlDelete, conn)
+                    cmd.Parameters.AddWithValue("@fmnum", fmNum)
+                    cmd.ExecuteNonQuery()
+                End Using
+
+                Thread.Sleep(1000)
+
+                '---------------------------------------------------------
+                ' Reset UI — identical logic to original
+                '---------------------------------------------------------
+                cmbFM1.Items.Clear()
+                cmbFM2.Items.Clear()
+                cmbFM3.Items.Clear()
+                cmbFM4.Items.Clear()
+                cmbDefaultFM.Items.Clear()
+
+                cmbFM1.Items.Add("None")
+                cmbFM2.Items.Add("None")
+                cmbFM3.Items.Add("None")
+                cmbFM4.Items.Add("None")
+
+                Dim sqlReload As String =
+                "SELECT FMNum FROM LUT_FuelModelParameters ORDER BY FMNum"
+
+                gf_SetControl(cmbFM1, sqlReload, strProjectPath)
+                gf_SetControl(cmbFM2, sqlReload, strProjectPath)
+                gf_SetControl(cmbFM3, sqlReload, strProjectPath)
+                gf_SetControl(cmbFM4, sqlReload, strProjectPath)
+                gf_SetControl(cmbDefaultFM, sqlReload, strProjectPath)
+
+                cmbDefaultFM.SelectedIndex = 0
+
+                cmbFM1.Text = "None"
+                cmbFM2.Text = "None"
+                cmbFM3.Text = "None"
+                cmbFM4.Text = "None"
+
+            End Using
+
+        Catch ex As Exception
             MsgBox("Error in cmdDelCstFM_Click - " & ex.Message)
         End Try
+
     End Sub
+
+
 
     Private Sub lstVwRulesets_MouseDown(ByVal sender As Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles lstVwRulesets.MouseDown
         Dim MousePt As Drawing.Point
@@ -2472,172 +2536,6 @@ Public Class frmRule
         End If
     End Sub
 
-    'Public Sub VisualRuleQuery(ByVal pMULayer As ESRI.ArcGIS.Carto.IRasterLayer,
-    '                           ByVal strSQLEVT As String, ByVal strSQLRule As String,
-    '                           ByVal strProjPath As String)
-    '    Dim rsFoundPoint As Integer 'Stores the last know found index
-    '    Dim frmVisQuery = New frmVisualQueryStatus()
-
-    '    Dim rs1 As New ADODB.Recordset                                  'recordset for data
-    '    Dim rs2 As New ADODB.Recordset                                  'recordset for data
-
-    '    Dim dbconn As New ADODB.Connection                              'DB connection
-    '    dbconn.ConnectionString = gs_DBConnection &
-    '    strProjectPath & "\" & gs_LFTFCDBName
-    '    dbconn.Open()
-
-    '    Try
-    '        frmVisQuery.Show()
-
-    '        ' Get raster input from layer
-    '        Dim pRaster As ESRI.ArcGIS.Geodatabase.IRaster
-    '        pRaster = pMULayer.Raster
-
-    '        ' Get the number of rows from raster table
-    '        Dim pTable As ESRI.ArcGIS.Geodatabase.ITable
-    '        Dim pband As ESRI.ArcGIS.DataSourcesRaster.IRasterBand
-    '        Dim pBandCol As ESRI.ArcGIS.DataSourcesRaster.IRasterBandCollection
-    '        pBandCol = pRaster
-    '        pband = pBandCol.Item(0)
-    '        Dim TableExist As Boolean
-    '        pband.HasTable(TableExist)
-    '        If Not TableExist Then Exit Sub
-    '        pTable = pband.AttributeTable
-    '        Dim NumOfValues As Integer
-    '        NumOfValues = pTable.RowCount(Nothing)
-
-    '        '' Create random color
-    '        'Dim pRamp As ESRI.ArcGIS.Display.IRandomColorRamp
-    '        'pRamp = New ESRI.ArcGIS.Display.RandomColorRamp
-    '        'pRamp.Size = NumOfValues
-    '        'pRamp.Seed = 100
-    '        'pRamp.CreateRamp(True)
-    '        Dim pFSymbol As ESRI.ArcGIS.Display.ISimpleFillSymbol
-
-    '        ' Create UniqueValue renderer and QI RasterRenderer
-    '        Dim pRen As ESRI.ArcGIS.Carto.IRasterUniqueValueRenderer
-    '        pRen = New ESRI.ArcGIS.Carto.RasterUniqueValueRenderer
-    '        Dim pRasRen As ESRI.ArcGIS.Carto.IRasterRenderer
-    '        pRasRen = pRen
-
-    '        ' Connect renderer and raster
-    '        pRasRen.Raster = pRaster
-    '        pRasRen.Update()
-
-    '        ' Set UniqueValue renderer
-    '        pRen.HeadingCount = 1   ' Use one heading
-    '        pRen.Heading(0) = "EVT:Blue & Rule:Yellow"
-    '        pRen.ClassCount(0) = NumOfValues
-
-    '        Dim i As Long
-    '        Dim pRow As ESRI.ArcGIS.Geodatabase.IRow
-    '        Dim LabelValue As Object
-
-    '        'Open database, run the SQL statement
-    '        rs1.Open(strSQLEVT, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-    '        rs2.Open(strSQLRule, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-
-    '        For i = 0 To NumOfValues - 1
-    '            pRow = pTable.GetRow(i) 'Get a row from the table
-
-    '            Dim pColor As ESRI.ArcGIS.Display.IRgbColor
-    '            pColor = New ESRI.ArcGIS.Display.RgbColor
-
-    '            LabelValue = pRow.Value(3)  ' Get value of the given index
-    '            pColor.RGB = RGB(0, 0, 0)
-    '            If LabelValue = rs1.Fields(0).Value Then
-    '                LabelValue = pRow.Value(1)  ' Get value of the given index
-    '                'Bright blue for EVT
-    '                pColor.RGB = RGB(0, 255, 197)
-
-    '                rs2.Find("VALUE = " & pRow.Value(1))
-    '                If rs2.EOF = False Then
-    '                    rsFoundPoint = rs2.AbsolutePosition
-    '                    'Bright red for rule
-    '                    pColor.RGB = RGB(255, 0, 0)
-    '                End If
-    '                If rs2.EOF = True Then
-    '                    rs2.MoveFirst()
-    '                    rs2.Move(rsFoundPoint)
-    '                End If
-    '            End If
-    '            LabelValue = pRow.Value(1)  ' Get value of the given index
-    '            pRen.AddValue(0, i, LabelValue)  'Set value for the renderer
-    '            pRen.Label(0, i) = CStr(LabelValue)  ' Set label
-    '            pFSymbol = New ESRI.ArcGIS.Display.SimpleFillSymbol
-    '            If pColor.RGB = RGB(0, 0, 0) Then
-    '                pColor.NullColor = True
-    '                pFSymbol.Color = pColor
-    '            Else
-    '                pFSymbol.Color = pColor
-    '            End If
-
-    '            pRen.Symbol(0, i) = pFSymbol  'Set symbol
-    '            frmVisQuery.ChangeProgress(i / NumOfValues * 100, NumOfValues - i)
-    '        Next i
-
-    '        ' Update render and refresh layer
-    '        pRasRen.Update()
-    '        pMULayer.Renderer = pRen
-    '        Dim pLegInfo As ESRI.ArcGIS.Carto.ILegendInfo
-    '        pLegInfo = pRen
-    '        Dim pLegGroup As ESRI.ArcGIS.Carto.ILegendGroup
-    '        pLegGroup = pLegInfo.LegendGroup(0)
-    '        pLegGroup.Visible = False
-    '        gs_pMxDoc.ActiveView.Refresh()
-    '        gs_pMxDoc.UpdateContents()
-
-    '        'pDoc = ThisDocument
-    '        'Dim pMap As IMap
-    '        'pMap = pDoc.FocusMap
-
-    '        'Dim pLayer As IRasterLayer
-    '        'pLayer = pMap.Layer(0)
-
-    '        'Dim pRend As IRasterRenderer
-    '        'pRend = pLayer.Renderer
-    '        'Dim pLegInfo As ILegendInfo
-    '        'pLegInfo = pRend
-    '        'Dim pLegGroup As ILegendGroup
-    '        'pLegGroup = pLegInfo.LegendGroup(0)
-    '        'pLegGroup.Visible = False
-    '        'pDoc.UpdateContents()
-
-    '        frmVisQuery.Close()
-
-    '        ' Clean up
-    '        frmVisQuery = Nothing
-    '        pLegInfo = Nothing
-    '        pLegGroup = Nothing
-    '        pMULayer = Nothing
-    '        pRen = Nothing
-    '        pRasRen = Nothing
-    '        'pRamp = Nothing
-    '        pFSymbol = Nothing
-    '        pRaster = Nothing
-    '        pband = Nothing
-    '        pBandCol = Nothing
-    '        pTable = Nothing
-    '        pRow = Nothing
-
-    '        If rs1.State <> 0 Then rs1.Close()
-    '        rs1 = Nothing
-    '        If rs2.State <> 0 Then rs2.Close()
-    '        rs2 = Nothing
-
-    '        If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-    '        dbconn = Nothing
-    '    Catch ex As Exception
-    '        If rs1.State <> 0 Then rs1.Close()
-    '        rs1 = Nothing
-    '        If rs2.State <> 0 Then rs2.Close()
-    '        rs2 = Nothing
-
-    '        If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-    '        dbconn = Nothing
-    '        MsgBox("Visual Rule Query: " & ex.Message)
-    '    End Try
-    'End Sub
 
     Private Sub cmsEditRule_Closing(ByVal sender As Object, ByVal e As System.Windows.Forms.ToolStripDropDownClosingEventArgs) Handles cmsEditRule.Closing
         cmsEditRule.Items.Clear()
@@ -2648,653 +2546,999 @@ Public Class frmRule
     End Sub
 
     Private Sub PopCMSEditRule(ByVal strClickedLowHigh As String, ByVal MPoint As Drawing.Point)
+
         Dim strNum As String
         Dim strCode As String
+        Dim strSQL As String
 
-        If IsEVTSelected() Then
-            Dim rs1 As New ADODB.Recordset                                  'recordset for data
-            Dim dbconn As New ADODB.Connection                              'DB connection
-            dbconn.ConnectionString = gs_DBConnection &
-            strProjectPath & "\" & gs_LFTFCDBName
-            dbconn.Open()
+        If IsEVTSelected() = False Then Exit Sub
 
-            Try
-                If strCMSItem = "CovLH" Then
-                    'Populate cmsEditRule values
-                    strSQL = "SELECT EVCR FROM " & comboR & " " &
-                   "WHERE (EVTR = " & gf_GetNum(cmbEVT.Text, "EVT") &
-                   " And DIST = " & gf_GetNum(cmbEVT.Text, "DIST") & ")" &
-                   " Group By EVCR ORDER BY EVCR"
+        Try
 
-                    addToCMSEditRule(strSQL, "cov", strClickedLowHigh, ruleE.IntCovLow, ruleE.IntCovHigh)
-                ElseIf strCMSItem = "HgtLH" Then
-                    'Populate cmsEditRule values
-                    strSQL = "SELECT EVHR FROM " & comboR & " " &
-                   "WHERE (EVTR = " & gf_GetNum(cmbEVT.Text, "EVT") &
-                   " And DIST = " & gf_GetNum(cmbEVT.Text, "DIST") & ")" &
-                   " Group By EVHR ORDER BY EVHR"
+            Dim evtNum As Integer = gf_GetNum(cmbEVT.Text, "EVT")
+            Dim distNum As Integer
 
-                    addToCMSEditRule(strSQL, "hgt", strClickedLowHigh, ruleE.IntHgtLow, ruleE.IntHgtHigh)
-                ElseIf strCMSItem = "BPS" Then
-                    'Populate cmsEditRule
-                    strSQL = "SELECT " & comboR & ".BPSRF, LUT_BPS.Name, LUT_BPS.BPS_Model " &
-                             "FROM " & comboR & " " &
-                             "LEFT JOIN LUT_BPS ON " & comboR & ".BPSRF = LUT_BPS.BPS " &
-                             "WHERE (EVTR = " & gf_GetNum(cmbEVT.Text, "EVT") &
-                             " And DIST = " & gf_GetNum(cmbEVT.Text, "DIST") & ")" &
-                             " GROUP BY " & comboR & ".BPSRF, LUT_BPS.Name, LUT_BPS.BPS_Model " &
-                             " ORDER BY BPSRF"
+            Using conn As New SQLiteConnection("Data Source=" & strProjectPath & "\" & gs_LFTFCSQliteName)
+                conn.Open()
 
-                    rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                cmsEditRule.Items.Clear()
 
-                    cmsEditRule.Items.Add("any")
+                Select Case strCMSItem
 
-                    Do Until rs1.EOF
-                        cmsEditRule.Items.Add(rs1.Fields(0).Value & "   " & rs1.Fields(1).Value & " - " &
-                                           rs1.Fields(2).Value) 'Combine BPS#,BPS Name,and BPS
-                        rs1.MoveNext()
-                    Loop
-                ElseIf strCMSItem = "Wild" Then
-                    'Populate cmsEditRule
-                    strSQL = "SELECT WILDCARD FROM " & comboR & " " &
-                   "WHERE (EVTR = " & gf_GetNum(cmbEVT.Text, "EVT") &
-                   " And DIST = " & gf_GetNum(cmbEVT.Text, "DIST") & ")" &
-                   " Group By WILDCARD ORDER BY WILDCARD"
-                    rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+            ' ---------------------------------------------------------
+            ' CovLH
+            ' ---------------------------------------------------------
+                    Case "CovLH"
+                        strSQL =
+                            "SELECT EVCR FROM " & comboR &
+                            " WHERE EVTR=@EVT AND DIST=@DIST " &
+                            " GROUP BY EVCR ORDER BY EVCR"
 
-                    cmsEditRule.Items.Add("any")
+                        addToCMSEditRule(strSQL, "cov", strClickedLowHigh,
+                                               ruleE.IntCovLow, ruleE.IntCovHigh)
 
-                    Do Until rs1.EOF
-                        cmsEditRule.Items.Add(rs1.Fields(0).Value)
-                        rs1.MoveNext()
-                    Loop
-                ElseIf strCMSItem = "FM13" Then
-                    'Populate cmsEditRule
-                    strSQL = "SELECT FMNum, FMName " &
-                    "FROM LUT_FuelModelParameters " &
-                    "WHERE (LUT_FuelModelParameters.Creator = 'Anderson13' Or " &
-                    "LUT_FuelModelParameters.Creator = 'Nonburnable') " &
-                    "ORDER BY FMNum"
-                    rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+            ' ---------------------------------------------------------
+            ' HgtLH
+            ' ---------------------------------------------------------
+                    Case "HgtLH"
+                        strSQL =
+                            "SELECT EVHR FROM " & comboR &
+                            " WHERE EVTR=@EVT AND DIST=@DIST " &
+                            " GROUP BY EVHR ORDER BY EVHR"
 
-                    cmsEditRule.Items.Add("9999   Nothing Assigned")
+                        addToCMSEditRule(strSQL, "hgt", strClickedLowHigh,
+                                               ruleE.IntHgtLow, ruleE.IntHgtHigh)
 
-                    Do Until rs1.EOF
-                        cmsEditRule.Items.Add(rs1.Fields(0).Value & "   " & rs1.Fields(1).Value) '2 fields
-                        rs1.MoveNext()
-                    Loop
-                ElseIf strCMSItem = "FM40" Then
-                    'Populate cmsEditRule
-                    strSQL = "SELECT FMNum, FMCode, FMName " &
-                     "FROM LUT_FuelModelParameters " &
-                     "WHERE (LUT_FuelModelParameters.Creator = 'ScottAndBurgan40' Or " &
-                     "LUT_FuelModelParameters.Creator = 'Nonburnable') " &
-                     " ORDER BY FMNum"
-                    rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+            ' ---------------------------------------------------------
+            ' BPS
+            ' ---------------------------------------------------------
+                    Case "BPS"
+                        strSQL =
+                            "SELECT " & comboR & ".BPSRF, LUT_BPS.Name, LUT_BPS.BPS_Model " &
+                            "FROM " & comboR &
+                            " LEFT JOIN LUT_BPS ON " & comboR & ".BPSRF = LUT_BPS.BPS " &
+                            "WHERE EVTR=@EVT AND DIST=@DIST " &
+                            " GROUP BY " & comboR & ".BPSRF, LUT_BPS.Name, LUT_BPS.BPS_Model " &
+                            " ORDER BY BPSRF"
 
-                    cmsEditRule.Items.Add("     9999   Nothing Assigned")
+                        cmsEditRule.Items.Add("any")
 
-                    Do Until rs1.EOF
-                        strNum = rs1.Fields(0).Value
-                        strCode = rs1.Fields(1).Value
-                        If Strings.Len(strNum & "") = 1 Then strNum = "00" & strNum
-                        If Strings.Len(strNum & "") = 2 Then strNum = "0" & strNum
-                        If Strings.Len(strCode & "") = 1 Then strCode = "00" & strCode
-                        If Strings.Len(strCode & "") = 2 Then strCode = "0" & strCode
-                        cmsEditRule.Items.Add(strCode & " / " & strNum & "   " &
-                                           rs1.Fields(2).Value) 'Combine FMNum / FMCode  FMName
-                        rs1.MoveNext()
-                    Loop
-                ElseIf strCMSItem = "CanFM" Then
-                    'Populate cmsEditRule
-                    strSQL = "SELECT FM, Description " &
-                     "FROM LUT_Canadian_FBPS_Fuel_Types " &
-                     "WHERE (((LUT_Canadian_FBPS_Fuel_Types.FMID)<>0 And (LUT_Canadian_FBPS_Fuel_Types.FMID)<>-9999)) " &
-                     "ORDER BY ID"
-                    rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                        Using cmd As New SQLiteCommand(strSQL, conn)
+                            cmd.Parameters.AddWithValue("@EVT", evtNum)
+                            cmd.Parameters.AddWithValue("@DIST", distNum)
 
-                    Do Until rs1.EOF
-                        cmsEditRule.Items.Add(rs1.Fields(0).Value & "   " & rs1.Fields(1).Value) '2 fields
-                        rs1.MoveNext()
-                    Loop
-                    'ElseIf strCMSItem = "FCCS" Then
-                    '    'Populate cmsEditRule
-                    '    strSQL = "SELECT FCCS, Description " &
-                    '     "FROM LUT_FCCS_FERA " &
-                    '     " ORDER BY ID"
-                    '    rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                            Using rd As SQLiteDataReader = cmd.ExecuteReader()
+                                While rd.Read()
+                                    cmsEditRule.Items.Add(
+                                        rd.GetValue(0).ToString() & "   " &
+                                        rd.GetValue(1).ToString() & " - " &
+                                        rd.GetValue(2).ToString()
+                                    )
+                                End While
+                            End Using
+                        End Using
 
-                    '    Do Until rs1.EOF
-                    '        cmsEditRule.Items.Add(rs1.Fields(0).Value & "   " & rs1.Fields(1).Value) '2 fields
-                    '        rs1.MoveNext()
-                    '    Loop
-                ElseIf strCMSItem = "FLM" Then
-                    'Populate cmsEditRule
-                    strSQL = "SELECT FLM, Description " &
-                        "FROM LUT_FLM_Lutes " &
-                        " ORDER BY ID"
-                    rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
 
-                    Do Until rs1.EOF
-                        cmsEditRule.Items.Add(rs1.Fields(0).Value & "   " & rs1.Fields(1).Value) '2 fields
-                        rs1.MoveNext()
-                    Loop
-                ElseIf strCMSItem = "CG" Then
-                    'Populate cmsEditRule
-                    strSQL = "SELECT Canopy_Fuel_Mask, Description " &
-                     "FROM LUT_Canopy_Fuel_Mask " &
-                     " ORDER BY ID"
-                    rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+            ' ---------------------------------------------------------
+            ' Wild
+            ' ---------------------------------------------------------
+                    Case "Wild"
+                        strSQL =
+                            "SELECT WILDCARD FROM " & comboR &
+                            " WHERE EVTR=@EVT AND DIST=@DIST " &
+                            " GROUP BY WILDCARD ORDER BY WILDCARD"
 
-                    Do Until rs1.EOF
-                        cmsEditRule.Items.Add(rs1.Fields(0).Value & "   " & rs1.Fields(1).Value) '2 fields
-                        rs1.MoveNext()
-                    Loop
-                ElseIf strCMSItem = "CC" Then
-                    'Populate cmsEditRule
-                    cmsEditRule.Items.Add("9999")
+                        cmsEditRule.Items.Add("any")
 
-                    strSQL = "SELECT LUT_Cover.Lifeform, LUT_Cover.MidPoint " &
-                             "FROM LUT_Cover " &
-                             "WHERE (((LUT_Cover.Lifeform)='Tree'))"
-                    rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                        Using cmd As New SQLiteCommand(strSQL, conn)
+                            cmd.Parameters.AddWithValue("@EVT", evtNum)
+                            cmd.Parameters.AddWithValue("@DIST", distNum)
 
-                    Do Until rs1.EOF
-                        cmsEditRule.Items.Add(rs1.Fields!MidPoint.Value) 'Fill with Midpoint Values
-                        rs1.MoveNext()
-                    Loop
-                ElseIf strCMSItem = "CH" Then
-                    'Populate cmsEditRule
-                    cmsEditRule.Items.Add("9999")
+                            Using rd As SQLiteDataReader = cmd.ExecuteReader()
+                                While rd.Read()
+                                    cmsEditRule.Items.Add(rd.GetValue(0).ToString())
+                                End While
+                            End Using
+                        End Using
 
-                    strSQL = "SELECT LUT_Height.Lifeform, LUT_Height.MidPoint " &
-                             "FROM LUT_Height " &
-                             "WHERE (((LUT_Height.Lifeform)='Tree'))"
-                    rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
 
-                    Do Until rs1.EOF
-                        cmsEditRule.Items.Add(rs1.Fields!MidPoint.Value * 10 & "(m x 10)") 'Fill with Midpoint Values
-                        rs1.MoveNext()
-                    Loop
-                ElseIf strCMSItem = "CBD13" Then
-                    'Populate cmsEditRule
-                    With cmsEditRule
-                        .Items.Add("9999")
-                        For i = 1 To 45
-                            .Items.Add(i & " kg/m^3x100")
-                        Next i
-                    End With
-                ElseIf strCMSItem = "CBD40" Then
-                    'Populate cmsEditRule
-                    With cmsEditRule
-                        .Items.Add("9999")
-                        For i = 1 To 45
-                            .Items.Add(i & " kg/m^3x100")
-                        Next i
-                    End With
+            ' ---------------------------------------------------------
+            ' FM13
+            ' ---------------------------------------------------------
+                    Case "FM13"
+                        strSQL =
+                            "SELECT FMNum, FMName " &
+                            "FROM LUT_FuelModelParameters " &
+                            "WHERE Creator='Anderson13' OR Creator='Nonburnable' " &
+                            "ORDER BY FMNum"
 
-                ElseIf strCMSItem = "CBH13" Then
-                    'Populate cmsEditRule
-                    With cmsEditRule
-                        .Items.Add("9999")
-                        For i = 1 To 100
-                            .Items.Add(i & " mx10")
-                        Next i
-                    End With
+                        cmsEditRule.Items.Add("9999   Nothing Assigned")
 
-                ElseIf strCMSItem = "CBH40" Then
-                    'Populate cmsEditRule
-                    With cmsEditRule
-                        .Items.Add("9999")
-                        For i = 1 To 100
-                            .Items.Add(i & " mx10")
-                        Next i
-                    End With
+                        Using cmd As New SQLiteCommand(strSQL, conn)
+                            Using rd As SQLiteDataReader = cmd.ExecuteReader()
+                                While rd.Read()
+                                    cmsEditRule.Items.Add(
+                                        rd.GetValue(0).ToString() & "   " &
+                                        rd.GetValue(1).ToString()
+                                    )
+                                End While
+                            End Using
+                        End Using
 
-                ElseIf strCMSItem = "OnOff" Then
-                    'Populate cmsEditRule
-                    With cmsEditRule
-                        .Items.Add("On")
-                        .Items.Add("Off")
-                    End With
-                End If
+
+            ' ---------------------------------------------------------
+            ' FM40
+            ' ---------------------------------------------------------
+                    Case "FM40"
+                        strSQL =
+                            "SELECT FMNum, FMCode, FMName " &
+                            "FROM LUT_FuelModelParameters " &
+                            "WHERE Creator='ScottAndBurgan40' OR Creator='Nonburnable' " &
+                            "ORDER BY FMNum"
+
+                        cmsEditRule.Items.Add("     9999   Nothing Assigned")
+
+                        Using cmd As New SQLiteCommand(strSQL, conn)
+                            Using rd As SQLiteDataReader = cmd.ExecuteReader()
+                                While rd.Read()
+                                    strNum = rd.GetValue(0).ToString().PadLeft(3, "0"c)
+                                    strCode = rd.GetValue(1).ToString().PadLeft(3, "0"c)
+
+                                    cmsEditRule.Items.Add(
+                                        strCode & " / " & strNum &
+                                        "   " & rd.GetValue(2).ToString()
+                                    )
+                                End While
+                            End Using
+                        End Using
+
+
+            ' ---------------------------------------------------------
+            ' CanFM
+            ' ---------------------------------------------------------
+                    Case "CanFM"
+                        strSQL =
+                            "SELECT FM, Description " &
+                            "FROM LUT_Canadian_FBPS_Fuel_Types " &
+                            "WHERE FMID<>0 AND FMID<>-9999 " &
+                            "ORDER BY ID"
+
+                        Using cmd As New SQLiteCommand(strSQL, conn)
+                            Using rd As SQLiteDataReader = cmd.ExecuteReader()
+                                While rd.Read()
+                                    cmsEditRule.Items.Add(
+                                        rd.GetValue(0).ToString() & "   " &
+                                        rd.GetValue(1).ToString()
+                                    )
+                                End While
+                            End Using
+                        End Using
+
+
+            ' ---------------------------------------------------------
+            ' FLM
+            ' ---------------------------------------------------------
+                    Case "FLM"
+                        strSQL =
+                            "SELECT FLM, Description " &
+                            "FROM LUT_FLM_Lutes " &
+                            "ORDER BY ID"
+
+                        Using cmd As New SQLiteCommand(strSQL, conn)
+                            Using rd As SQLiteDataReader = cmd.ExecuteReader()
+                                While rd.Read()
+                                    cmsEditRule.Items.Add(
+                                        rd.GetValue(0).ToString() & "   " &
+                                        rd.GetValue(1).ToString()
+                                    )
+                                End While
+                            End Using
+                        End Using
+
+
+            ' ---------------------------------------------------------
+            ' CG
+            ' ---------------------------------------------------------
+                    Case "CG"
+                        strSQL =
+                            "SELECT Canopy_Fuel_Mask, Description " &
+                            "FROM LUT_Canopy_Fuel_Mask " &
+                            "ORDER BY ID"
+
+                        Using cmd As New SQLiteCommand(strSQL, conn)
+                            Using rd As SQLiteDataReader = cmd.ExecuteReader()
+                                While rd.Read()
+                                    cmsEditRule.Items.Add(
+                                        rd.GetValue(0).ToString() & "   " &
+                                        rd.GetValue(1).ToString()
+                                    )
+                                End While
+                            End Using
+                        End Using
+
+
+            ' ---------------------------------------------------------
+            ' CC
+            ' ---------------------------------------------------------
+                    Case "CC"
+                        cmsEditRule.Items.Add("9999")
+
+                        strSQL =
+                            "SELECT MidPoint FROM LUT_Cover WHERE Lifeform='Tree'"
+
+                        Using cmd As New SQLiteCommand(strSQL, conn)
+                            Using rd As SQLiteDataReader = cmd.ExecuteReader()
+                                While rd.Read()
+                                    cmsEditRule.Items.Add(rd.GetValue(0).ToString())
+                                End While
+                            End Using
+                        End Using
+
+
+            ' ---------------------------------------------------------
+            ' CH
+            ' ---------------------------------------------------------
+                    Case "CH"
+                        cmsEditRule.Items.Add("9999")
+
+                        strSQL =
+                            "SELECT MidPoint FROM LUT_Height WHERE Lifeform='Tree'"
+
+                        Using cmd As New SQLiteCommand(strSQL, conn)
+                            Using rd As SQLiteDataReader = cmd.ExecuteReader()
+                                While rd.Read()
+                                    cmsEditRule.Items.Add(
+                                        (CInt(rd.GetValue(0)) * 10).ToString() &
+                                        "(m x 10)"
+                                    )
+                                End While
+                            End Using
+                        End Using
+
+
+            ' ---------------------------------------------------------
+            ' CBD13 / CBD40
+            ' ---------------------------------------------------------
+                    Case "CBD13", "CBD40"
+                        cmsEditRule.Items.Add("9999")
+                        For i As Integer = 1 To 45
+                            cmsEditRule.Items.Add(i & " kg/m^3x100")
+                        Next
+
+
+            ' ---------------------------------------------------------
+            ' CBH13 / CBH40
+            ' ---------------------------------------------------------
+                    Case "CBH13", "CBH40"
+                        cmsEditRule.Items.Add("9999")
+                        For i As Integer = 1 To 100
+                            cmsEditRule.Items.Add(i & " mx10")
+                        Next
+
+
+            ' ---------------------------------------------------------
+            ' OnOff
+            ' ---------------------------------------------------------
+                    Case "OnOff"
+                        cmsEditRule.Items.Add("On")
+                        cmsEditRule.Items.Add("Off")
+
+                End Select
 
                 cmsEditRule.Show(MPoint)
 
-                If rs1.State <> 0 Then rs1.Close()
-                rs1 = Nothing
 
-                If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-                dbconn = Nothing
-            Catch ex As Exception
-                If rs1.State <> 0 Then rs1.Close()
-                rs1 = Nothing
+                '' ---------------------------------------------------------
+                '' CovLH → Cover Low/High
+                '' ---------------------------------------------------------
+                'If strCMSItem = "CovLH" Then
 
-                If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-                dbconn = Nothing
-                MsgBox("PopCMSEditRule - " & ex.Message)
-            End Try
-        End If
+                '    strSQL =
+                '    "SELECT EVCR FROM " & comboR &
+                '    " WHERE EVTR = " & gf_GetNum(cmbEVT.Text, "EVT") &
+                '    " AND DIST = " & gf_GetNum(cmbEVT.Text, "DIST") &
+                '    " GROUP BY EVCR ORDER BY EVCR"
+
+                '    addToCMSEditRule(strSQL, "cov", strClickedLowHigh, ruleE.IntCovLow, ruleE.IntCovHigh)
+                '    cmsEditRule.Show(MPoint)
+                '    Exit Sub
+
+                'End If
+
+                '' ---------------------------------------------------------
+                '' HgtLH → Height Low/High
+                '' ---------------------------------------------------------
+                'If strCMSItem = "HgtLH" Then
+
+                '    strSQL =
+                '    "SELECT EVHR FROM " & comboR &
+                '    " WHERE EVTR = " & gf_GetNum(cmbEVT.Text, "EVT") &
+                '    " AND DIST = " & gf_GetNum(cmbEVT.Text, "DIST") &
+                '    " GROUP BY EVHR ORDER BY EVHR"
+
+                '    addToCMSEditRule(strSQL, "hgt", strClickedLowHigh, ruleE.IntHgtLow, ruleE.IntHgtHigh)
+                '    cmsEditRule.Show(MPoint)
+                '    Exit Sub
+
+                'End If
+
+                '' ---------------------------------------------------------
+                '' BPS
+                '' ---------------------------------------------------------
+                'If strCMSItem = "BPS" Then
+
+                '    strSQL =
+                '    "SELECT " & comboR & ".BPSRF, LUT_BPS.Name, LUT_BPS.BPS_Model " &
+                '    "FROM " & comboR &
+                '    " LEFT JOIN LUT_BPS ON " & comboR & ".BPSRF = LUT_BPS.BPS " &
+                '    "WHERE EVTR=" & gf_GetNum(cmbEVT.Text, "EVT") &
+                '    " AND DIST=" & gf_GetNum(cmbEVT.Text, "DIST") &
+                '    " GROUP BY " & comboR & ".BPSRF, LUT_BPS.Name, LUT_BPS.BPS_Model " &
+                '    " ORDER BY BPSRF"
+
+                '    cmsEditRule.Items.Add("any")
+
+                '    Using cmd As New SQLiteCommand(strSQL, conn)
+                '        Using rd = cmd.ExecuteReader()
+                '            While rd.Read()
+                '                cmsEditRule.Items.Add(
+                '                rd(0).ToString() & "   " &
+                '                rd(1).ToString() & " - " &
+                '                rd(2).ToString()
+                '            )
+                '            End While
+                '        End Using
+                '    End Using
+
+                '    cmsEditRule.Show(MPoint)
+                '    Exit Sub
+
+                'End If
+
+                '' ---------------------------------------------------------
+                '' Wild
+                '' ---------------------------------------------------------
+                'If strCMSItem = "Wild" Then
+
+                '    strSQL =
+                '    "SELECT WILDCARD FROM " & comboR &
+                '    " WHERE EVTR=" & gf_GetNum(cmbEVT.Text, "EVT") &
+                '    " AND DIST=" & gf_GetNum(cmbEVT.Text, "DIST") &
+                '    " GROUP BY WILDCARD ORDER BY WILDCARD"
+
+                '    cmsEditRule.Items.Add("any")
+
+                '    Using cmd As New SQLiteCommand(strSQL, conn)
+                '        Using rd = cmd.ExecuteReader()
+                '            While rd.Read()
+                '                cmsEditRule.Items.Add(rd(0).ToString())
+                '            End While
+                '        End Using
+                '    End Using
+
+                '    cmsEditRule.Show(MPoint)
+                '    Exit Sub
+
+                'End If
+
+                '' ---------------------------------------------------------
+                '' FM13
+                '' ---------------------------------------------------------
+                'If strCMSItem = "FM13" Then
+
+                '    strSQL =
+                '    "SELECT FMNum, FMName " &
+                '    "FROM LUT_FuelModelParameters " &
+                '    "WHERE Creator='Anderson13' OR Creator='Nonburnable' " &
+                '    "ORDER BY FMNum"
+
+                '    cmsEditRule.Items.Add("9999   Nothing Assigned")
+
+                '    Using cmd As New SQLiteCommand(strSQL, conn)
+                '        Using rd = cmd.ExecuteReader()
+                '            While rd.Read()
+                '                cmsEditRule.Items.Add(rd(0).ToString() & "   " & rd(1).ToString())
+                '            End While
+                '        End Using
+                '    End Using
+
+                '    cmsEditRule.Show(MPoint)
+                '    Exit Sub
+
+                'End If
+
+                '' ---------------------------------------------------------
+                '' FM40
+                '' ---------------------------------------------------------
+                'If strCMSItem = "FM40" Then
+
+                '    strSQL =
+                '    "SELECT FMNum, FMCode, FMName " &
+                '    "FROM LUT_FuelModelParameters " &
+                '    "WHERE Creator='ScottAndBurgan40' OR Creator='Nonburnable' " &
+                '    "ORDER BY FMNum"
+
+                '    cmsEditRule.Items.Add("     9999   Nothing Assigned")
+
+                '    Using cmd As New SQLiteCommand(strSQL, conn)
+                '        Using rd = cmd.ExecuteReader()
+                '            While rd.Read()
+                '                strNum = rd(0).ToString()
+                '                strCode = rd(1).ToString()
+
+                '                If strNum.Length = 1 Then strNum = "00" & strNum
+                '                If strNum.Length = 2 Then strNum = "0" & strNum
+                '                If strCode.Length = 1 Then strCode = "00" & strCode
+                '                If strCode.Length = 2 Then strCode = "0" & strCode
+
+                '                cmsEditRule.Items.Add(strCode & " / " & strNum & "   " & rd(2).ToString())
+                '            End While
+                '        End Using
+                '    End Using
+
+                '    cmsEditRule.Show(MPoint)
+                '    Exit Sub
+
+                'End If
+
+                '' ---------------------------------------------------------
+                '' CanFM
+                '' ---------------------------------------------------------
+                'If strCMSItem = "CanFM" Then
+
+                '    strSQL =
+                '    "SELECT FM, Description " &
+                '    "FROM LUT_Canadian_FBPS_Fuel_Types " &
+                '    "WHERE FMID<>0 AND FMID<>-9999 " &
+                '    "ORDER BY ID"
+
+                '    Using cmd As New SQLiteCommand(strSQL, conn)
+                '        Using rd = cmd.ExecuteReader()
+                '            While rd.Read()
+                '                cmsEditRule.Items.Add(rd(0).ToString() & "   " & rd(1).ToString())
+                '            End While
+                '        End Using
+                '    End Using
+
+                '    cmsEditRule.Show(MPoint)
+                '    Exit Sub
+
+                'End If
+
+                '' ---------------------------------------------------------
+                '' FLM
+                '' ---------------------------------------------------------
+                'If strCMSItem = "FLM" Then
+
+                '    strSQL =
+                '    "SELECT FLM, Description " &
+                '    "FROM LUT_FLM_Lutes " &
+                '    "ORDER BY ID"
+
+                '    Using cmd As New SQLiteCommand(strSQL, conn)
+                '        Using rd = cmd.ExecuteReader()
+                '            While rd.Read()
+                '                cmsEditRule.Items.Add(rd(0).ToString() & "   " & rd(1).ToString())
+                '            End While
+                '        End Using
+                '    End Using
+
+                '    cmsEditRule.Show(MPoint)
+                '    Exit Sub
+
+                'End If
+
+                '' ---------------------------------------------------------
+                '' CG
+                '' ---------------------------------------------------------
+                'If strCMSItem = "CG" Then
+
+                '    strSQL =
+                '    "SELECT Canopy_Fuel_Mask, Description " &
+                '    "FROM LUT_Canopy_Fuel_Mask " &
+                '    "ORDER BY ID"
+
+                '    Using cmd As New SQLiteCommand(strSQL, conn)
+                '        Using rd = cmd.ExecuteReader()
+                '            While rd.Read()
+                '                cmsEditRule.Items.Add(rd(0).ToString() & "   " & rd(1).ToString())
+                '            End While
+                '        End Using
+                '    End Using
+
+                '    cmsEditRule.Show(MPoint)
+                '    Exit Sub
+
+                'End If
+
+                '' ---------------------------------------------------------
+                '' CC (Canopy Cover)
+                '' ---------------------------------------------------------
+                'If strCMSItem = "CC" Then
+
+                '    cmsEditRule.Items.Add("9999")
+
+                '    strSQL =
+                '    "SELECT MidPoint FROM LUT_Cover WHERE Lifeform='Tree'"
+
+                '    Using cmd As New SQLiteCommand(strSQL, conn)
+                '        Using rd = cmd.ExecuteReader()
+                '            While rd.Read()
+                '                cmsEditRule.Items.Add(rd("MidPoint").ToString())
+                '            End While
+                '        End Using
+                '    End Using
+
+                '    cmsEditRule.Show(MPoint)
+                '    Exit Sub
+
+                'End If
+
+                '' ---------------------------------------------------------
+                '' CH (Canopy Height)
+                '' ---------------------------------------------------------
+                'If strCMSItem = "CH" Then
+
+                '    cmsEditRule.Items.Add("9999")
+
+                '    strSQL =
+                '    "SELECT MidPoint FROM LUT_Height WHERE Lifeform='Tree'"
+
+                '    Using cmd As New SQLiteCommand(strSQL, conn)
+                '        Using rd = cmd.ExecuteReader()
+                '            While rd.Read()
+                '                cmsEditRule.Items.Add((CDbl(rd("MidPoint")) * 10).ToString() & "(m x 10)")
+                '            End While
+                '        End Using
+                '    End Using
+
+                '    cmsEditRule.Show(MPoint)
+                '    Exit Sub
+
+                'End If
+
+                '' ---------------------------------------------------------
+                '' CBD13
+                '' ---------------------------------------------------------
+                'If strCMSItem = "CBD13" Then
+                '    cmsEditRule.Items.Add("9999")
+                '    For i As Integer = 1 To 45
+                '        cmsEditRule.Items.Add(i & " kg/m^3x100")
+                '    Next
+                '    cmsEditRule.Show(MPoint)
+                '    Exit Sub
+                'End If
+
+                '' ---------------------------------------------------------
+                '' CBD40
+                '' ---------------------------------------------------------
+                'If strCMSItem = "CBD40" Then
+                '    cmsEditRule.Items.Add("9999")
+                '    For i As Integer = 1 To 45
+                '        cmsEditRule.Items.Add(i & " kg/m^3x100")
+                '    Next
+                '    cmsEditRule.Show(MPoint)
+                '    Exit Sub
+                'End If
+
+                '' ---------------------------------------------------------
+                '' CBH13 / CBH40
+                '' ---------------------------------------------------------
+                'If strCMSItem = "CBH13" Then
+                '    cmsEditRule.Items.Add("9999")
+                '    For i As Integer = 1 To 100
+                '        cmsEditRule.Items.Add(i & " mx10")
+                '    Next
+                '    cmsEditRule.Show(MPoint)
+                '    Exit Sub
+                'End If
+
+                'If strCMSItem = "CBH40" Then
+                '    cmsEditRule.Items.Add("9999")
+                '    For i As Integer = 1 To 100
+                '        cmsEditRule.Items.Add(i & " mx10")
+                '    Next
+                '    cmsEditRule.Show(MPoint)
+                '    Exit Sub
+                'End If
+
+                '' ---------------------------------------------------------
+                '' OnOff
+                '' ---------------------------------------------------------
+                'If strCMSItem = "OnOff" Then
+                '    cmsEditRule.Items.Add("On")
+                '    cmsEditRule.Items.Add("Off")
+                '    cmsEditRule.Show(MPoint)
+                '    Exit Sub
+                'End If
+
+            End Using
+
+        Catch ex As Exception
+            MsgBox("PopCMSEditRule - " & ex.Message)
+        End Try
+
     End Sub
 
     Private Sub cmsLowHigh_ItemClicked(ByVal sender As Object, ByVal e As System.Windows.Forms.ToolStripItemClickedEventArgs) Handles cmsLowHigh.ItemClicked
         PopCMSEditRule(e.ClickedItem.Text, cmsLowHigh.Location)
     End Sub
 
+    Private Function ChangeNote(note As String, oldVal As Object, newVal As Object) As String
+        Return note & "  (" & oldVal & ") to (" & newVal & ")"
+    End Function
+
     Private Sub cmsEditRule_ItemClicked(ByVal sender As Object, ByVal e As System.Windows.Forms.ToolStripItemClickedEventArgs) Handles cmsEditRule.ItemClicked
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
-
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
-
         Try
-            If IsEVTSelected() Then
-                Dim Index As Integer        'Stores the index of the selected value
-                Dim strNewNote As String    'Stores the notes
-                Dim minCov As Integer = 9999     'Used in dao seek for a given lifeform 
-                Dim minHgt As Integer = 9999     'Used in dao seek for a given lifeform
+            If Not IsEVTSelected() Then Return
 
-                'Get Selected rule
-                Index = lstVwRulesets.SelectedItems(0).Index + 1
+            'Accessing SelectedItems(0) also validates a ruleset row is selected
+            '(throws into the Catch below if not). Value itself is unused — preserved from original.
+            Dim selectedIndex As Integer = lstVwRulesets.SelectedItems(0).Index + 1
 
-                'Set the beginning of the note
-                strNewNote = ruleE.Notes & vbCrLf & Now.ToShortTimeString & " " & Now.ToShortDateString & " " &
-                                        txtSessionName.Text & ": Changed "
+            Dim clicked As String = e.ClickedItem.Text
 
-                'Update the collection and the database
-                If strCMSItem = "cov low" Then
-                    If ruleE.StrCovLow <> e.ClickedItem.Text Then
-                        strNewNote = strNewNote & "  (" & ruleE.StrCovLow & ") to (" & e.ClickedItem.Text & ")"
-                        ruleE.StrCovLow = e.ClickedItem.Text
-                        gr_ClearPAP(RulesetCollection) 'Clears the Pixel count, Acres, and Percent evt of the ruleset
+            'Set the beginning of the note
+            Dim note As String = ruleE.Notes & vbCrLf & Now.ToShortTimeString & " " & Now.ToShortDateString & " " &
+                                 txtSessionName.Text & ": Changed "
+
+            Select Case strCMSItem
+                Case "cov low"
+                    If ruleE.StrCovLow <> clicked Then
+                        note = ChangeNote(note, ruleE.StrCovLow, clicked)
+                        ruleE.StrCovLow = clicked
+                        gr_ClearPAP(RulesetCollection)
                     End If
                     'Make all the values the same if Low cover is lessthan 101
-                    If Int(gf_ConvertBack(e.ClickedItem.Text, strProjectPath)) < 101 Then
-                        'Cover High
-                        strNewNote = strNewNote & "  (" & ruleE.StrCovHigh & ") to (" & e.ClickedItem.Text & ")"
-                        ruleE.StrCovHigh = e.ClickedItem.Text
-                        'Height Low
-                        strNewNote = strNewNote & "  (" & ruleE.StrHgtLow & ") to (" & e.ClickedItem.Text & ")"
-                        ruleE.StrHgtLow = e.ClickedItem.Text
-                        'Height High
-                        strNewNote = strNewNote & "  (" & ruleE.StrHgtHigh & ") to (" & e.ClickedItem.Text & ")"
-                        ruleE.StrHgtHigh = e.ClickedItem.Text
-                        gr_ClearPAP(RulesetCollection) 'Clears the Pixel count, Acres, and Percent evt of the ruleset
+                    If Int(gf_ConvertBack(clicked, strProjectPath)) < 101 Then
+                        note = ChangeNote(note, ruleE.StrCovHigh, clicked) : ruleE.StrCovHigh = clicked
+                        note = ChangeNote(note, ruleE.StrHgtLow, clicked) : ruleE.StrHgtLow = clicked
+                        note = ChangeNote(note, ruleE.StrHgtHigh, clicked) : ruleE.StrHgtHigh = clicked
+                        gr_ClearPAP(RulesetCollection)
                     End If
-                ElseIf strCMSItem = "cov high" Then
-                    If ruleE.StrCovHigh <> e.ClickedItem.Text Then
-                        strNewNote = strNewNote & "  (" & ruleE.StrCovHigh & ") to (" & e.ClickedItem.Text & ")"
-                        ruleE.StrCovHigh = e.ClickedItem.Text
-                        gr_ClearPAP(RulesetCollection) 'Clears the Pixel count, Acres, and Percent evt of the ruleset
+
+                Case "cov high"
+                    If ruleE.StrCovHigh <> clicked Then
+                        note = ChangeNote(note, ruleE.StrCovHigh, clicked)
+                        ruleE.StrCovHigh = clicked
+                        gr_ClearPAP(RulesetCollection)
                     End If
-                ElseIf strCMSItem = "hgt low" Then
-                    If ruleE.StrHgtLow <> e.ClickedItem.Text Then
-                        strNewNote = strNewNote & "  (" & ruleE.StrHgtLow & ") to (" & e.ClickedItem.Text & ")"
-                        ruleE.StrHgtLow = e.ClickedItem.Text
-                        gr_ClearPAP(RulesetCollection) 'Clears the Pixel count, Acres, and Percent evt of the ruleset
+
+                Case "hgt low"
+                    If ruleE.StrHgtLow <> clicked Then
+                        note = ChangeNote(note, ruleE.StrHgtLow, clicked)
+                        ruleE.StrHgtLow = clicked
+                        gr_ClearPAP(RulesetCollection)
                     End If
                     'Make all the values the same if Low cover is lessthan 101
-                    If Int(gf_ConvertBack(e.ClickedItem.Text, strProjectPath)) < 101 Then
-                        'Height High
-                        strNewNote = strNewNote & "  (" & ruleE.StrHgtHigh & ") to (" & e.ClickedItem.Text & ")"
-                        ruleE.StrHgtHigh = e.ClickedItem.Text
-                        'Cover Low
-                        strNewNote = strNewNote & "  (" & ruleE.StrCovLow & ") to (" & e.ClickedItem.Text & ")"
-                        ruleE.StrCovLow = e.ClickedItem.Text
-                        'Cover High
-                        strNewNote = strNewNote & "  (" & ruleE.StrCovHigh & ") to (" & e.ClickedItem.Text & ")"
-                        ruleE.StrCovHigh = e.ClickedItem.Text
-                        gr_ClearPAP(RulesetCollection) 'Clears the Pixel count, Acres, and Percent evt of the ruleset
-                    End If
-                ElseIf strCMSItem = "hgt high" Then
-                    If ruleE.StrHgtHigh <> e.ClickedItem.Text Then
-                        strNewNote = strNewNote & "  (" & ruleE.StrHgtHigh & ") to (" & e.ClickedItem.Text & ")"
-                        ruleE.StrHgtHigh = e.ClickedItem.Text
-                        gr_ClearPAP(RulesetCollection) 'Clears the Pixel count, Acres, and Percent evt of the ruleset
-                    End If
-                ElseIf strCMSItem = "Add New Rule" Then
-                    'Find lifeform of selected value for cover and height and populate low first
-                    strSQL = "SELECT LUT_Cover.Lifeform, Min(LUT_Cover.EVC) AS MinOfEVC, Min(LUT_Height.EVH) AS MinOfEVH " &
-                             "FROM LUT_Height INNER JOIN LUT_Cover ON LUT_Height.Lifeform = LUT_Cover.Lifeform " &
-                             "GROUP BY LUT_Cover.Lifeform " &
-                             "HAVING (((LUT_Cover.Lifeform)='Herb')) OR " &
-                             "(((LUT_Cover.Lifeform)='Shrub')) OR " &
-                             "(((LUT_Cover.Lifeform)='Sparse')) OR " &
-                             "(((LUT_Cover.Lifeform)='Tree'))"
-                    rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-
-                    If e.ClickedItem.Text = "Add Ag, Urban, Developed, Or Sparse Rule" Then
-                        Do Until rs1.EOF = True
-                            If rs1.Fields!Lifeform.Value = "Sparse" Then
-                                minCov = rs1.Fields!MinOfEVC.Value
-                                minHgt = rs1.Fields!MinOfEVH.Value
-                                Exit Do
-                            End If
-                            rs1.MoveNext()
-                        Loop
-
-                        strSQL = "INSERT INTO " & rulesR & "(EVT, DIST, Cover_Low, Cover_High, Height_Low, Height_High, " &
-                                "BPSRF, Wildcard, FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, CCover, CHeight, CBD13x100, CBD40x100, " &
-                                "CBH13mx10, CBH40mx10, OnOff, Notes) " &
-                                "VALUES (" & gf_GetNum(cmbEVT.Text, "EVT") & ", " & gf_GetNum(cmbEVT.Text, "DIST") & ", " &
-                                minCov & ", " & minCov & ", " & minHgt & ", " & minHgt & ", 'any', 'any', 9999, 9999, '9999', '9999', 9999, 9999, 0, 9999, 9999, " &
-                                "9999, 9999, 9999, 'On', '" & Now.ToShortTimeString & " " & Now.ToShortDateString &
-                                " " & txtSessionName.Text & ": NEW Ag, Urban, Developed, Or Sparse Rule')"
-                    ElseIf e.ClickedItem.Text = "Add Herb Rule" Then
-                        Do Until rs1.EOF = True
-                            If rs1.Fields!Lifeform.Value = "Herb" Then
-                                minCov = rs1.Fields!MinOfEVC.Value
-                                minHgt = rs1.Fields!MinOfEVH.Value
-                                Exit Do
-                            End If
-                            rs1.MoveNext()
-                        Loop
-                        minCov = rs1.Fields!MinOfEVC.Value
-                        minHgt = rs1.Fields!MinOfEVH.Value
-                        strSQL = "INSERT INTO " & rulesR & "(EVT, DIST, Cover_Low, Cover_High, Height_Low, Height_High, " &
-                                "BPSRF, Wildcard, FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, CCover, CHeight, CBD13x100, CBD40x100, " &
-                                "CBH13mx10, CBH40mx10, OnOff, Notes) " &
-                                "VALUES (" & gf_GetNum(cmbEVT.Text, "EVT") & ", " & gf_GetNum(cmbEVT.Text, "DIST") & ", " &
-                                minCov & ", " & minCov & ", " & minHgt & ", " & minHgt & ", 'any', 'any', 9999, 9999, '9999', '9999', 9999, 9999, 0, 9999, 9999, " &
-                                "9999, 9999, 9999, 'On', '" & Now.ToShortTimeString & " " & Now.ToShortDateString &
-                                " " & txtSessionName.Text & ": NEW Herb Rule')"
-                    ElseIf e.ClickedItem.Text = "Add Shrub Rule" Then
-                        Do Until rs1.EOF = True
-                            If rs1.Fields!Lifeform.Value = "Shrub" Then
-                                minCov = rs1.Fields!MinOfEVC.Value
-                                minHgt = rs1.Fields!MinOfEVH.Value
-                                Exit Do
-                            End If
-                            rs1.MoveNext()
-                        Loop
-                        strSQL = "INSERT INTO " & rulesR & "(EVT, DIST, Cover_Low, Cover_High, Height_Low, Height_High, " &
-                                "BPSRF, Wildcard, FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, CCover, CHeight, CBD13x100, CBD40x100, " &
-                                "CBH13mx10, CBH40mx10, OnOff, Notes) " &
-                                "VALUES (" & gf_GetNum(cmbEVT.Text, "EVT") & ", " & gf_GetNum(cmbEVT.Text, "DIST") & ", " &
-                                minCov & ", " & minCov & ", " & minHgt & ", " & minHgt & ", 'any', 'any', 9999, 9999, '9999', '9999', 9999, 9999, 0, 9999, 9999, " &
-                                "9999, 9999, 9999, 'On', '" & Now.ToShortTimeString & " " & Now.ToShortDateString &
-                                " " & txtSessionName.Text & ": NEW Shrub Rule')"
-                    ElseIf e.ClickedItem.Text = "Add Tree Rule" Then
-                        Do Until rs1.EOF = True
-                            If rs1.Fields!Lifeform.Value = "Tree" Then
-                                minCov = rs1.Fields!MinOfEVC.Value
-                                minHgt = rs1.Fields!MinOfEVH.Value
-                                Exit Do
-                            End If
-                            rs1.MoveNext()
-                        Loop
-                        strSQL = "INSERT INTO " & rulesR & "(EVT, DIST, Cover_Low, Cover_High, Height_Low, Height_High, " &
-                                "BPSRF, Wildcard, FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, CCover, CHeight, CBD13x100, CBD40x100, " &
-                                "CBH13mx10, CBH40mx10, OnOff, Notes) " &
-                                "VALUES (" & gf_GetNum(cmbEVT.Text, "EVT") & ", " & gf_GetNum(cmbEVT.Text, "DIST") & ", " &
-                                minCov & ", " & minCov & ", " & minHgt & ", " & minHgt & ", 'any', 'any', 9999, 9999, '9999', '9999', 9999, 9999, 1, 9999, 9999, " &
-                                "9999, 9999, 9999, 'On', '" & Now.ToShortTimeString & " " & Now.ToShortDateString &
-                                " " & txtSessionName.Text & ": NEW Tree Rule')"
+                    If Int(gf_ConvertBack(clicked, strProjectPath)) < 101 Then
+                        note = ChangeNote(note, ruleE.StrHgtHigh, clicked) : ruleE.StrHgtHigh = clicked
+                        note = ChangeNote(note, ruleE.StrCovLow, clicked) : ruleE.StrCovLow = clicked
+                        note = ChangeNote(note, ruleE.StrCovHigh, clicked) : ruleE.StrCovHigh = clicked
+                        gr_ClearPAP(RulesetCollection)
                     End If
 
-                    'Run the SQL statement
-                    dbconn.Execute(strSQL)
+                Case "hgt high"
+                    If ruleE.StrHgtHigh <> clicked Then
+                        note = ChangeNote(note, ruleE.StrHgtHigh, clicked)
+                        ruleE.StrHgtHigh = clicked
+                        gr_ClearPAP(RulesetCollection)
+                    End If
 
-                    gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR,
-                                  RulesetCollection, EVTPixelCountCollection, strProjectPath)
-                    DisplayRuleset()
-                ElseIf strCMSItem = "BPS" Then
-                    If ruleE.BPS <> gf_GetNum(e.ClickedItem.Text, "General") Then
-                        strNewNote = strNewNote & "  (" & ruleE.BPS & ") to (" & gf_GetNum(e.ClickedItem.Text, "General") & ")"
-                        ruleE.BPS = gf_GetNum(e.ClickedItem.Text, "General")
-                        gr_ClearPAP(RulesetCollection) 'Clears the Pixel count, Acres, and Percent evt of the ruleset
-                    End If
-                ElseIf strCMSItem = "Wild" Then
-                    If ruleE.Wildcard <> e.ClickedItem.Text Then
-                        strNewNote = strNewNote & "  (" & ruleE.Wildcard & ") to (" & e.ClickedItem.Text & ")"
-                        ruleE.Wildcard = e.ClickedItem.Text
-                        gr_ClearPAP(RulesetCollection) 'Clears the Pixel count, Acres, and Percent evt of the ruleset
-                    End If
-                ElseIf strCMSItem = "FM13" Then
-                    If ruleE.FBFM13 <> gf_GetNum(e.ClickedItem.Text, "General") Then
-                        strNewNote = strNewNote & "  (" & ruleE.FBFM13 & ") to (" & gf_GetNum(e.ClickedItem.Text, "General") & ")"
-                        ruleE.FBFM13 = gf_GetNum(e.ClickedItem.Text, "General")
-                    End If
-                ElseIf strCMSItem = "FM40" Then
-                    If ruleE.FBFM40 <> Trim(Strings.Left(e.ClickedItem.Text, 9)) Then
-                        strNewNote = strNewNote & "  (" & ruleE.FBFM40 & ") to (" & Trim(Strings.Left(e.ClickedItem.Text, 9)) & ")"
-                        ruleE.FBFM40 = Trim(Strings.Left(e.ClickedItem.Text, 9))
-                    End If
-                ElseIf strCMSItem = "CanFM" Then
-                    If ruleE.CanFM <> Trim(Strings.Left(e.ClickedItem.Text, 9)) Then
-                        strNewNote = strNewNote & "  (" & ruleE.CanFM & ") to (" & Trim(Strings.Left(e.ClickedItem.Text, 9)) & ")"
-                        ruleE.CanFM = Trim(Strings.Left(e.ClickedItem.Text, 9))
-                    End If
-                ElseIf strCMSItem = "FCCS" Then
-                    If ruleE.FCCS <> gf_GetNum(e.ClickedItem.Text, "General") Then
-                        strNewNote = strNewNote & "  (" & ruleE.FCCS & ") to (" & gf_GetNum(e.ClickedItem.Text, "General") & ")"
-                        ruleE.FCCS = gf_GetNum(e.ClickedItem.Text, "General")
-                    End If
-                ElseIf strCMSItem = "FLM" Then
-                    If ruleE.FLM <> gf_GetNum(e.ClickedItem.Text, "General") Then
-                        strNewNote = strNewNote & "  (" & ruleE.FLM & ") to (" & gf_GetNum(e.ClickedItem.Text, "General") & ")"
-                        ruleE.FLM = gf_GetNum(e.ClickedItem.Text, "General")
-                    End If
-                ElseIf strCMSItem = "CG" Then
-                    If ruleE.Canopy <> gf_GetNum(e.ClickedItem.Text, "General") Then
-                        strNewNote = strNewNote & "  (" & ruleE.Canopy & ") to (" & gf_GetNum(e.ClickedItem.Text, "General") & ")"
-                        ruleE.Canopy = gf_GetNum(e.ClickedItem.Text, "General")
-                    End If
-                ElseIf strCMSItem = "CC" Then
-                    If ruleE.CCover <> e.ClickedItem.Text Then
-                        strNewNote = strNewNote & "  (" & ruleE.CCover & ") to (" & e.ClickedItem.Text & ")"
-                        ruleE.CCover = e.ClickedItem.Text
-                    End If
-                ElseIf strCMSItem = "CH" Then
-                    If ruleE.CHeight <> e.ClickedItem.Text Then
-                        strNewNote = strNewNote & "  (" & ruleE.CHeight & ") to (" & gf_GetNum(e.ClickedItem.Text, "General") & ")"
-                        ruleE.CHeight = gf_GetNum(e.ClickedItem.Text, "General")
-                    End If
-                ElseIf strCMSItem = "CBD13" Then
-                    If ruleE.CBD13 <> gf_GetNum(e.ClickedItem.Text, "General") Then
-                        strNewNote = strNewNote & "  (" & ruleE.CBD13 & ") to (" & gf_GetNum(e.ClickedItem.Text, "General") & ")"
-                        ruleE.CBD13 = gf_GetNum(e.ClickedItem.Text, "General")
-                    End If
-                ElseIf strCMSItem = "CBD40" Then
-                    If ruleE.CBD40 <> gf_GetNum(e.ClickedItem.Text, "General") Then
-                        strNewNote = strNewNote & "  (" & ruleE.CBD40 & ") to (" & gf_GetNum(e.ClickedItem.Text, "General") & ")"
-                        ruleE.CBD40 = gf_GetNum(e.ClickedItem.Text, "General")
-                    End If
-                ElseIf strCMSItem = "CBH13" Then
-                    If ruleE.CBH13 <> gf_GetNum(e.ClickedItem.Text, "General") Then
-                        strNewNote = strNewNote & "  (" & ruleE.CBH13 & ") to (" & gf_GetNum(e.ClickedItem.Text, "General") & ")"
-                        ruleE.CBH13 = gf_GetNum(e.ClickedItem.Text, "General")
-                    End If
-                ElseIf strCMSItem = "CBH40" Then
-                    If ruleE.CBH40 <> gf_GetNum(e.ClickedItem.Text, "General") Then
-                        strNewNote = strNewNote & "  (" & ruleE.CBH40 & ") to (" & gf_GetNum(e.ClickedItem.Text, "General") & ")"
-                        ruleE.CBH40 = gf_GetNum(e.ClickedItem.Text, "General")
-                    End If
-                ElseIf strCMSItem = "OnOff" Then
-                    If ruleE.OnOff <> e.ClickedItem.Text Then
-                        strNewNote = strNewNote & "  (" & ruleE.OnOff & ") to (" & e.ClickedItem.Text & ")"
-                        ruleE.OnOff = e.ClickedItem.Text
-                        gr_ClearPAP(RulesetCollection) 'Clears the Pixel count, Acres, and Percent evt of the ruleset
-                    End If
-                End If
-                ruleE.Notes = strNewNote
+                Case "Add New Rule"
+                    AddNewRule(clicked)
 
-                gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR, RulesetCollection,
-                                  EVTPixelCountCollection, strProjectPath)
-                DisplayRuleset()
-                AdjPer()
-            End If
+                Case "BPS"
+                    Dim newVal As Object = gf_GetNum(clicked, "General")
+                    If ruleE.BPS <> newVal Then
+                        note = ChangeNote(note, ruleE.BPS, newVal)
+                        ruleE.BPS = newVal
+                        gr_ClearPAP(RulesetCollection)
+                    End If
 
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
+                Case "Wild"
+                    If ruleE.Wildcard <> clicked Then
+                        note = ChangeNote(note, ruleE.Wildcard, clicked)
+                        ruleE.Wildcard = clicked
+                        gr_ClearPAP(RulesetCollection)
+                    End If
 
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
+                Case "FM13"
+                    Dim newVal As Object = gf_GetNum(clicked, "General")
+                    If ruleE.FBFM13 <> newVal Then
+                        note = ChangeNote(note, ruleE.FBFM13, newVal)
+                        ruleE.FBFM13 = newVal
+                    End If
+
+                Case "FM40"
+                    Dim newVal As String = Trim(Strings.Left(clicked, 9))
+                    If ruleE.FBFM40 <> newVal Then
+                        note = ChangeNote(note, ruleE.FBFM40, newVal)
+                        ruleE.FBFM40 = newVal
+                    End If
+
+                Case "CanFM"
+                    Dim newVal As String = Trim(Strings.Left(clicked, 9))
+                    If ruleE.CanFM <> newVal Then
+                        note = ChangeNote(note, ruleE.CanFM, newVal)
+                        ruleE.CanFM = newVal
+                    End If
+
+                Case "FCCS"
+                    Dim newVal As Object = gf_GetNum(clicked, "General")
+                    If ruleE.FCCS <> newVal Then
+                        note = ChangeNote(note, ruleE.FCCS, newVal)
+                        ruleE.FCCS = newVal
+                    End If
+
+                Case "FLM"
+                    Dim newVal As Object = gf_GetNum(clicked, "General")
+                    If ruleE.FLM <> newVal Then
+                        note = ChangeNote(note, ruleE.FLM, newVal)
+                        ruleE.FLM = newVal
+                    End If
+
+                Case "CG"
+                    Dim newVal As Object = gf_GetNum(clicked, "General")
+                    If ruleE.Canopy <> newVal Then
+                        note = ChangeNote(note, ruleE.Canopy, newVal)
+                        ruleE.Canopy = newVal
+                    End If
+
+                Case "CC"
+                    If ruleE.CCover <> clicked Then
+                        note = ChangeNote(note, ruleE.CCover, clicked)
+                        ruleE.CCover = clicked
+                    End If
+
+                Case "CH"
+                    'Preserved quirk: compares against raw text, but stores/notes the gf_GetNum value.
+                    If ruleE.CHeight <> clicked Then
+                        note = ChangeNote(note, ruleE.CHeight, gf_GetNum(clicked, "General"))
+                        ruleE.CHeight = gf_GetNum(clicked, "General")
+                    End If
+
+                Case "CBD13"
+                    Dim newVal As Object = gf_GetNum(clicked, "General")
+                    If ruleE.CBD13 <> newVal Then
+                        note = ChangeNote(note, ruleE.CBD13, newVal)
+                        ruleE.CBD13 = newVal
+                    End If
+
+                Case "CBD40"
+                    Dim newVal As Object = gf_GetNum(clicked, "General")
+                    If ruleE.CBD40 <> newVal Then
+                        note = ChangeNote(note, ruleE.CBD40, newVal)
+                        ruleE.CBD40 = newVal
+                    End If
+
+                Case "CBH13"
+                    Dim newVal As Object = gf_GetNum(clicked, "General")
+                    If ruleE.CBH13 <> newVal Then
+                        note = ChangeNote(note, ruleE.CBH13, newVal)
+                        ruleE.CBH13 = newVal
+                    End If
+
+                Case "CBH40"
+                    Dim newVal As Object = gf_GetNum(clicked, "General")
+                    If ruleE.CBH40 <> newVal Then
+                        note = ChangeNote(note, ruleE.CBH40, newVal)
+                        ruleE.CBH40 = newVal
+                    End If
+
+                Case "OnOff"
+                    If ruleE.OnOff <> clicked Then
+                        note = ChangeNote(note, ruleE.OnOff, clicked)
+                        ruleE.OnOff = clicked
+                        gr_ClearPAP(RulesetCollection)
+                    End If
+            End Select
+
+            ruleE.Notes = note
+
+            gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR,
+                           RulesetCollection, EVTPixelCountCollection, strProjectPath)
+            DisplayRuleset()
+            AdjPer()
         Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-
             MsgBox("Error in cmsEditRule_ItemClicked - " & ex.Message)
         End Try
+    End Sub
+
+    Private Sub AddNewRule(clickedText As String)
+        Dim lifeform As String
+        Dim cCover As Integer
+        Dim label As String
+
+        Select Case clickedText
+            Case "Add Ag, Urban, Developed, Or Sparse Rule"
+                lifeform = "Sparse" : cCover = 0 : label = "NEW Ag, Urban, Developed, Or Sparse Rule"
+            Case "Add Herb Rule"
+                lifeform = "Herb" : cCover = 0 : label = "NEW Herb Rule"
+            Case "Add Shrub Rule"
+                lifeform = "Shrub" : cCover = 0 : label = "NEW Shrub Rule"
+            Case "Add Tree Rule"
+                lifeform = "Tree" : cCover = 1 : label = "NEW Tree Rule"
+            Case Else
+                Return 'No matching add option — nothing inserted (matches original)
+        End Select
+
+        Dim minCov As Integer = 9999    'Used for a given lifeform, default if not found
+        Dim minHgt As Integer = 9999    'Used for a given lifeform, default if not found
+
+        Using conn As New SQLiteConnection("Data Source=" & strProjectPath & "\" & gs_LFTFCSQliteName & ";")
+            conn.Open()
+
+            'Find lifeform min for cover and height
+            Dim lookupSql As String =
+                "SELECT LUT_Cover.Lifeform, Min(LUT_Cover.EVC) AS MinOfEVC, Min(LUT_Height.EVH) AS MinOfEVH " &
+                "FROM LUT_Height INNER JOIN LUT_Cover ON LUT_Height.Lifeform = LUT_Cover.Lifeform " &
+                "GROUP BY LUT_Cover.Lifeform " &
+                "HAVING LUT_Cover.Lifeform IN ('Herb', 'Shrub', 'Sparse', 'Tree')"
+
+            Using cmd As New SQLiteCommand(lookupSql, conn)
+                Using reader As SQLiteDataReader = cmd.ExecuteReader()
+                    While reader.Read()
+                        If reader("Lifeform").ToString() = lifeform Then
+                            minCov = CInt(reader("MinOfEVC"))
+                            minHgt = CInt(reader("MinOfEVH"))
+                            Exit While
+                        End If
+                    End While
+                End Using
+            End Using
+
+            Dim insertSql As String =
+                "INSERT INTO " & rulesR & " (EVT, DIST, Cover_Low, Cover_High, Height_Low, Height_High, " &
+                "BPSRF, Wildcard, FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, CCover, CHeight, CBD13x100, CBD40x100, " &
+                "CBH13mx10, CBH40mx10, OnOff, Notes) " &
+                "VALUES (@evt, @dist, @cov, @cov, @hgt, @hgt, 'any', 'any', 9999, 9999, '9999', '9999', 9999, 9999, " &
+                "@ccover, 9999, 9999, 9999, 9999, 9999, 'On', @note)"
+
+            Dim noteText As String = Now.ToShortTimeString & " " & Now.ToShortDateString & " " &
+                                     txtSessionName.Text & ": " & label
+
+            Using cmd As New SQLiteCommand(insertSql, conn)
+                cmd.Parameters.AddWithValue("@evt", gf_GetNum(cmbEVT.Text, "EVT"))
+                cmd.Parameters.AddWithValue("@dist", gf_GetNum(cmbEVT.Text, "DIST"))
+                cmd.Parameters.AddWithValue("@cov", minCov)
+                cmd.Parameters.AddWithValue("@hgt", minHgt)
+                cmd.Parameters.AddWithValue("@ccover", cCover)
+                cmd.Parameters.AddWithValue("@note", noteText)
+                cmd.ExecuteNonQuery()
+            End Using
+        End Using
+
+        'NOTE: original ran these here AND again in the caller's tail (double call). Preserved.
+        gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR,
+                       RulesetCollection, EVTPixelCountCollection, strProjectPath)
+        DisplayRuleset()
     End Sub
 
     Private Sub addToCMSEditRule(ByVal strSQLCSM As String, ByVal strCovOrHgt As String,
                                  ByVal strLowOrHigh As String, ByVal intGTOET As Integer,
                                  ByVal intLTOET As Integer)
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
-        Dim rs2 As New ADODB.Recordset                                  'recordset for data
-        Dim rs3 As New ADODB.Recordset                                  'recordset for data
-        Dim rs4 As New ADODB.Recordset                                  'recordset for data
-
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
-
+        'LTOET - Less than or equal to
+        'GTOET - Greater than or equal to
         Try
-            If IsEVTSelected() Then
-                'LTOET - Less than or equal to
-                'GTOET - Greater than or equal to
+            If Not IsEVTSelected() Then Return
 
-                Dim insertValue As Integer
+            Select Case strLowOrHigh
+                Case "Sort by Cover (Default)"
+                    ApplyRuleSort("Sort by Cover")
 
-                If strLowOrHigh = "Sort by Cover (Default)" Then
-                    gr_SetRuleSort = "Sort by Cover"
-                    gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR, RulesetCollection,
-                             EVTPixelCountCollection, strProjectPath)
-                    DisplayRuleset()
-                ElseIf strLowOrHigh = "Sort by Height" Then
-                    gr_SetRuleSort = "Sort by Height"
-                    gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR, RulesetCollection,
-                             EVTPixelCountCollection, strProjectPath)
-                    DisplayRuleset()
-                ElseIf strLowOrHigh = "Add New rule to edit" Then
+                Case "Sort by Height"
+                    ApplyRuleSort("Sort by Height")
+
+                Case "Add New rule to edit"
                     strCMSItem = "Add New Rule"
                     cmsEditRule.Items.Add("Add Ag, Urban, Developed, Or Sparse Rule")
                     cmsEditRule.Items.Add("Add Herb Rule")
                     cmsEditRule.Items.Add("Add Shrub Rule")
                     cmsEditRule.Items.Add("Add Tree Rule")
-                ElseIf strLowOrHigh = "Edit Low side of range" Then
-                    'Set the strCMSItem
+
+                Case "Edit Low side of range"
                     strCMSItem = strCovOrHgt & " low"
+                    PopulateRangeItems(strSQLCSM, strCovOrHgt, "low", intGTOET, intLTOET)
 
-                    'Find lifeform of selected value for cover and height and populate low first
-                    strSQL = "SELECT LUT_Cover.Lifeform, Min(LUT_Cover.EVC) AS MinOfEVC, Min(LUT_Height.EVH) AS MinOfEVH " &
-                             "FROM LUT_Height INNER JOIN LUT_Cover ON LUT_Height.Lifeform = LUT_Cover.Lifeform " &
-                             "GROUP BY LUT_Cover.Lifeform " &
-                             "HAVING (((LUT_Cover.Lifeform)='Herb')) OR " &
-                             "(((LUT_Cover.Lifeform)='Shrub')) OR " &
-                             "(((LUT_Cover.Lifeform)='Tree'))"
-                    rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-
-                    'First loop is herb, second is shrub, third is tree
-                    Do Until rs1.EOF
-                        If strCovOrHgt = "cov" And intGTOET >= rs1.Fields!MinOfEVC.Value Then      'If cov use intGTOET gets cover
-                            intGTOET = rs1.Fields!MinOfEVC.Value
-                            Exit Do
-                        ElseIf strCovOrHgt = "hgt" And intGTOET >= rs1.Fields!MinOfEVH.Value Then  'If hgt use intGTOET gets height
-                            intGTOET = rs1.Fields!MinOfEVH.Value
-                            Exit Do
-                        ElseIf intGTOET <= 100 Then                                                 'If Sparse or 2 digit it gets lowest
-                            intGTOET = 11
-                            Exit Do
-                        Else
-                            rs1.MoveNext()
-                        End If
-                    Loop
-
-                    'Populate cmsEditRule
-                    strSQL = strSQLCSM
-                    rs2.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-
-                    Do Until rs2.EOF
-                        insertValue = rs2.Fields(0).Value
-
-                        If insertValue >= intGTOET And insertValue <= intLTOET Then
-                            cmsEditRule.Items.Add(gf_ConvertCode(insertValue, strCovOrHgt, "low", strProjectPath))
-                        End If
-                        rs2.MoveNext()
-                    Loop
-
-                ElseIf strLowOrHigh = "Edit High side of range" Then
-                    'Set the strCMSItem
+                Case "Edit High side of range"
                     strCMSItem = strCovOrHgt & " high"
+                    PopulateRangeItems(strSQLCSM, strCovOrHgt, "high", intGTOET, intLTOET)
 
-                    'Find lifeform of selected value for cover and height and populate low first
-                    strSQL = "SELECT LUT_Cover.Lifeform, Max(LUT_Cover.EVC) AS MaxOfEVC, Max(LUT_Height.EVH) AS MaxOfEVH " &
-                             "FROM LUT_Height INNER JOIN LUT_Cover ON LUT_Height.Lifeform = LUT_Cover.Lifeform " &
-                             "GROUP BY LUT_Cover.Lifeform " &
-                             "HAVING (((LUT_Cover.Lifeform)='Herb')) OR " &
-                             "(((LUT_Cover.Lifeform)='Shrub')) OR " &
-                             "(((LUT_Cover.Lifeform)='Tree')) " &
-                             "ORDER BY LUT_Cover.Lifeform DESC"
-                    rs3.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-
-                    'First loop is Tree, second is shrub, third is herb
-                    Do Until rs3.EOF
-                        If strCovOrHgt = "cov" And intLTOET <= rs3.Fields!MaxOfEVC.Value Then      'If cov use intLTOET gets cover
-                            intLTOET = rs3.Fields!MaxOfEVC.Value
-                            Exit Do
-                        ElseIf strCovOrHgt = "hgt" And intLTOET <= rs3.Fields!MaxOfEVH.Value Then  'If hgt use intLTOET gets height
-                            intLTOET = rs3.Fields!MaxOfEVH.Value
-                            Exit Do
-                        ElseIf intLTOET <= 100 Then                                                 'If Sparse or 2 digit it gets lowest
-                            intLTOET = 100
-                            Exit Do
-                        Else
-                            rs3.MoveNext()
-                        End If
-                    Loop
-
-                    'Populate cmsEditRule
-                    strSQL = strSQLCSM
-                    rs4.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-
-                    Do Until rs4.EOF
-                        insertValue = rs4.Fields(0).Value
-
-                        If insertValue >= intGTOET And insertValue <= intLTOET Then
-                            cmsEditRule.Items.Add(gf_ConvertCode(insertValue, strCovOrHgt, "high", strProjectPath))
-                        End If
-                        rs4.MoveNext()
-                    Loop
-                Else
+                Case Else
                     'It is not a proper selection
-                End If
-            End If
-
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-            If rs2.State <> 0 Then rs2.Close()
-            rs2 = Nothing
-            If rs3.State <> 0 Then rs3.Close()
-            rs3 = Nothing
-            If rs4.State <> 0 Then rs4.Close()
-            rs4 = Nothing
-
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
+            End Select
         Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-            If rs2.State <> 0 Then rs2.Close()
-            rs2 = Nothing
-            If rs3.State <> 0 Then rs3.Close()
-            rs3 = Nothing
-            If rs4.State <> 0 Then rs4.Close()
-            rs4 = Nothing
-
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-
             MsgBox("Error in addToCMSEditRule - " & ex.Message)
         End Try
     End Sub
+
+
+    Private Sub ApplyRuleSort(sortMode As String)
+        gr_SetRuleSort = sortMode
+        gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR,
+                       RulesetCollection, EVTPixelCountCollection, strProjectPath)
+        DisplayRuleset()
+    End Sub
+
+    Private Sub PopulateRangeItems(sqlCms As String, covOrHgt As String, side As String,
+                                   gtoet As Integer, ltoet As Integer)
+        Using conn As New SQLiteConnection("Data Source=" & strProjectPath & "\" & gs_LFTFCSQliteName & ";")
+            conn.Open()
+
+            'Find lifeform of selected value for cover and height and bound the range
+            If side = "low" Then
+                gtoet = ResolveLowBound(conn, covOrHgt, gtoet)
+            Else
+                ltoet = ResolveHighBound(conn, covOrHgt, ltoet)
+            End If
+
+            'Populate cmsEditRule
+            Using cmd As New SQLiteCommand(sqlCms, conn)
+                Using reader As SQLiteDataReader = cmd.ExecuteReader()
+                    While reader.Read()
+                        Dim insertValue As Integer = CInt(reader.GetValue(0))
+
+                        If insertValue >= gtoet And insertValue <= ltoet Then
+                            cmsEditRule.Items.Add(gf_ConvertCode(insertValue, covOrHgt, side, strProjectPath))
+                        End If
+                    End While
+                End Using
+            End Using
+        End Using
+    End Sub
+
+    Private Function ResolveLowBound(conn As SQLiteConnection, covOrHgt As String, gtoet As Integer) As Integer
+        Dim sql As String =
+            "SELECT LUT_Cover.Lifeform, Min(LUT_Cover.EVC) AS MinOfEVC, Min(LUT_Height.EVH) AS MinOfEVH " &
+            "FROM LUT_Height INNER JOIN LUT_Cover ON LUT_Height.Lifeform = LUT_Cover.Lifeform " &
+            "GROUP BY LUT_Cover.Lifeform " &
+            "HAVING LUT_Cover.Lifeform IN ('Herb', 'Shrub', 'Tree') " &
+            "ORDER BY LUT_Cover.Lifeform"
+
+        'First loop is herb, second is shrub, third is tree
+        Using cmd As New SQLiteCommand(sql, conn)
+            Using reader As SQLiteDataReader = cmd.ExecuteReader()
+                While reader.Read()
+                    If covOrHgt = "cov" And gtoet >= CInt(reader("MinOfEVC")) Then      'If cov use gtoet gets cover
+                        Return CInt(reader("MinOfEVC"))
+                    ElseIf covOrHgt = "hgt" And gtoet >= CInt(reader("MinOfEVH")) Then  'If hgt use gtoet gets height
+                        Return CInt(reader("MinOfEVH"))
+                    ElseIf gtoet <= 100 Then                                            'If Sparse or 2 digit it gets lowest
+                        Return 11
+                    End If
+                End While
+            End Using
+        End Using
+
+        Return gtoet 'No match found — leave unchanged (matches original)
+    End Function
+
+    Private Function ResolveHighBound(conn As SQLiteConnection, covOrHgt As String, ltoet As Integer) As Integer
+        Dim sql As String =
+            "SELECT LUT_Cover.Lifeform, Max(LUT_Cover.EVC) AS MaxOfEVC, Max(LUT_Height.EVH) AS MaxOfEVH " &
+            "FROM LUT_Height INNER JOIN LUT_Cover ON LUT_Height.Lifeform = LUT_Cover.Lifeform " &
+            "GROUP BY LUT_Cover.Lifeform " &
+            "HAVING LUT_Cover.Lifeform IN ('Herb', 'Shrub', 'Tree') " &
+            "ORDER BY LUT_Cover.Lifeform DESC"
+
+        'First loop is Tree, second is shrub, third is herb
+        Using cmd As New SQLiteCommand(sql, conn)
+            Using reader As SQLiteDataReader = cmd.ExecuteReader()
+                While reader.Read()
+                    If covOrHgt = "cov" And ltoet <= CInt(reader("MaxOfEVC")) Then      'If cov use ltoet gets cover
+                        Return CInt(reader("MaxOfEVC"))
+                    ElseIf covOrHgt = "hgt" And ltoet <= CInt(reader("MaxOfEVH")) Then  'If hgt use ltoet gets height
+                        Return CInt(reader("MaxOfEVH"))
+                    ElseIf ltoet <= 100 Then                                            'If Sparse or 2 digit it gets lowest
+                        Return 100
+                    End If
+                End While
+            End Using
+        End Using
+
+        Return ltoet 'No match found — leave unchanged (matches original)
+    End Function
 
     Private Function IsEVTSelected() As Boolean
         If cmbEVT.Text <> "" Then
@@ -3307,94 +3551,37 @@ Public Class frmRule
         End If
     End Function
 
-    Private Sub OrderAndSortEVT()
-        Dim tempEVT As String = "False"                                 'Start with false for do until
-        Dim LUT_Table As String                                         'Set the look up table
-        Dim LUT_Name As String                                          'Set the lookup name field
-        Dim LUT_Num As String                                           'Set the lookup number field
-        Dim orderNameOrNumber As String                                 'Stores the order by string
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
+    'strSQL is re-executed downstream by gf_SetControl, so these queries cannot be
+    'parameterized — literals must be escaped instead.
+    Private Function SqlLiteral(value As String) As String
+        Return "'" & value.Replace("'", "''") & "'"
+    End Function
 
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+    Private Sub OrderAndSortEVT()
+        Const LUT_Table As String = "XWALK_EVT_EVG_EVS"     'Set the look up table
+        Const LUT_Name As String = "EVT_Name"               'Set the lookup name field
+        Const LUT_Num As String = "EVT"                     'Set the lookup number field
 
         Try
+            'Stores the order by string
+            Dim orderNameOrNumber As String = If(rdoName.Checked,
+                                                 LUT_Table & "." & LUT_Name,
+                                                 comboR & ".EVTR")
 
-            LUT_Table = "XWALK_EVT_EVG_EVS"
-            LUT_Name = "EVT_Name"
-            LUT_Num = "EVT"
-
-            If rdoName.Checked Then
-                orderNameOrNumber = LUT_Table & "." & LUT_Name
-            Else
-                orderNameOrNumber = comboR & ".EVTR"
-            End If
-
-            Select Case cmbSortRules.SelectedIndex
-                Case 0      'All by Type
-                    strSQL = "SELECT " & comboR & ".EVTR, " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name & " " &
-                             "FROM " & comboR & " LEFT JOIN " & LUT_Table & " " &
-                             "ON " & comboR & ".EVTR = " & LUT_Table & "." & LUT_Num & " " &
-                             "GROUP BY " & comboR & ".EVTR, " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name & " " &
-                             "ORDER BY " & comboR & ".DIST, " & orderNameOrNumber
-                Case 1      'All by EVT
-                    strSQL = "SELECT " & comboR & ".EVTR, " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name & " " &
-                             "FROM " & comboR & " LEFT JOIN " & LUT_Table & " " &
-                             "ON " & comboR & ".EVTR=" & LUT_Table & "." & LUT_Num & " " &
-                             "GROUP BY " & comboR & ".EVTR, " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name & ", " &
-                             comboR & ".DIST ORDER BY " & orderNameOrNumber & ", " & comboR & ".DIST"
-                Case 2      'Disturbed by Type
-                    strSQL = "SELECT " & comboR & ".EVTR, " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name & " " &
-                             "FROM " & comboR & " LEFT JOIN " & LUT_Table & " " &
-                             "ON " & comboR & ".EVTR=" & LUT_Table & "." & LUT_Num & " " &
-                             "GROUP BY " & comboR & ".EVTR, " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name & " " &
-                             "HAVING (((" & comboR & ".DIST) > 0)) " &
-                             "ORDER BY " & comboR & ".DIST, " & orderNameOrNumber
-                Case 3      'Disturbed by EVT
-                    strSQL = "SELECT " & comboR & ".EVTR, " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name & " " &
-                             "FROM " & comboR & " LEFT JOIN " & LUT_Table & " " &
-                             "ON " & comboR & ".EVTR= " & LUT_Table & "." & LUT_Num & " " &
-                             "GROUP BY " & comboR & ".EVTR, " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name & " " &
-                             "HAVING(((" & comboR & ".DIST) > 0)) " &
-                             "ORDER BY " & orderNameOrNumber & ", " & comboR & ".DIST"
-                Case 4      'Specific EVT
-                    Do Until tempEVT <> "False"
-                        tempEVT = InputBox("Enter the 4 digit " & LUT_Num & " code you want to sort." &
-                                           "Example " & LUT_Num & " 2227[0]: Enter 2227", "Sort for specific " & LUT_Num, "")
-                        If tempEVT = "" Then
-                            cmbSortRules.SelectedIndex = 0
-                        Else
-                            If tempEVT.Length = 4 And IsNumeric(tempEVT) Then
-                                strSQL = "SELECT " & comboR & ".EVTR, " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name & " " &
-                                         "FROM " & comboR & " LEFT JOIN " & LUT_Table & " " &
-                                         "ON " & comboR & ".EVTR = " & LUT_Table & "." & LUT_Num & " " &
-                                         "GROUP BY " & comboR & ".EVTR, " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name & ", " &
-                                         comboR & ".DIST " &
-                                         "HAVING(((" & comboR & ".EVTR) = " & tempEVT & ")) " &
-                                         "ORDER BY " & orderNameOrNumber & ", " & comboR & ".DIST"
-                            Else
-                                MsgBox(LUT_Num & " #: " & tempEVT & " does not exist in the Managament Unit" & vbCrLf &
-                                       "Try another " & LUT_Num & " #")
-                                tempEVT = "False"
-                            End If
-                        End If
-                    Loop
-                Case Else   'By Specific Disturbance Type
-                    strSQL = "SELECT " & comboR & ".EVTR, " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name & " " &
-                             "FROM (" & comboR & " LEFT JOIN " & LUT_Table & " " &
-                             "ON " & comboR & ".EVTR = " & LUT_Table & "." & LUT_Num & ") " &
-                             "INNER JOIN LUT_DistCode ON " & comboR & ".DIST = LUT_DistCode.DistCode " &
-                             "GROUP BY " & comboR & ".EVTR, " & comboR & ".DIST, " & LUT_Table & "." & LUT_Name & ", " &
-                             "LUT_DistCode.Type " &
-                             "HAVING(((LUT_DistCode.Type) = """ & cmbSortRules.Text & """)) ORDER BY " & orderNameOrNumber
-            End Select
+            strSQL = BuildSortSql(LUT_Table, LUT_Name, LUT_Num, orderNameOrNumber)
 
             'Check for EVTs after selection if none then clear the CMBEVT and the rulesets
-            rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+            Dim hasRows As Boolean
+            Using conn As New SQLiteConnection("Data Source=" & strProjectPath & "\" & gs_LFTFCSQliteName & ";")
+                conn.Open()
+                Using cmd As New SQLiteCommand(strSQL, conn)
+                    Using reader As SQLiteDataReader = cmd.ExecuteReader()
+                        hasRows = reader.Read()
+                    End Using
+                End Using
+            End Using
 
-            If rs1.EOF Then
+            If Not hasRows Then
                 MsgBox("No values do not exist in this MU" & vbCrLf &
                        "for the selected filter. Returning to" & vbCrLf &
                        "All by type.")
@@ -3410,27 +3597,76 @@ Public Class frmRule
                 If cmbEVT.Items.Count <> 0 Then cmbEVT.SelectedIndex = 0
 
                 'Make rulesets and display the
-                gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR, RulesetCollection,
-                              EVTPixelCountCollection, strProjectPath)
+                gr_MakeRuleset(gf_GetNum(cmbEVT.Text, "EVT"), gf_GetNum(cmbEVT.Text, "DIST"), comboR, rulesR,
+                               RulesetCollection, EVTPixelCountCollection, strProjectPath)
                 DisplayRuleset()
                 AdjPer()
             End If
-
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
         Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-
             MsgBox("Error in OrderAndSortEVT- " & ex.Message)
         End Try
     End Sub
+
+    Private Function BuildSortSql(lutTable As String, lutName As String, lutNum As String,
+                                  orderNameOrNumber As String) As String
+        Dim selectFrom As String =
+            "SELECT " & comboR & ".EVTR, " & comboR & ".DIST, " & lutTable & "." & lutName & " " &
+            "FROM " & comboR & " LEFT JOIN " & lutTable & " " &
+            "ON " & comboR & ".EVTR = " & lutTable & "." & lutNum & " "
+
+        Dim groupBy As String =
+            "GROUP BY " & comboR & ".EVTR, " & comboR & ".DIST, " & lutTable & "." & lutName & " "
+
+        Select Case cmbSortRules.SelectedIndex
+            Case 0      'All by Type
+                Return selectFrom & groupBy &
+                       "ORDER BY " & comboR & ".DIST, " & orderNameOrNumber
+
+            Case 1      'All by EVT
+                Return selectFrom & groupBy &
+                       "ORDER BY " & orderNameOrNumber & ", " & comboR & ".DIST"
+
+            Case 2      'Disturbed by Type
+                Return selectFrom & groupBy &
+                       "HAVING " & comboR & ".DIST > 0 " &
+                       "ORDER BY " & comboR & ".DIST, " & orderNameOrNumber
+
+            Case 3      'Disturbed by EVT
+                Return selectFrom & groupBy &
+                       "HAVING " & comboR & ".DIST > 0 " &
+                       "ORDER BY " & orderNameOrNumber & ", " & comboR & ".DIST"
+
+            Case 4      'Specific EVT
+                Dim tempEVT As String = "False"     'Start with false for do until
+                Do Until tempEVT <> "False"
+                    tempEVT = InputBox("Enter the 4 digit " & lutNum & " code you want to sort." &
+                                       "Example " & lutNum & " 2227[0]: Enter 2227", "Sort for specific " & lutNum, "")
+                    If tempEVT = "" Then
+                        cmbSortRules.SelectedIndex = 0
+                    ElseIf tempEVT.Length = 4 AndAlso IsNumeric(tempEVT) Then
+                        'tempEVT is validated as 4-digit numeric, safe to embed
+                        Return selectFrom & groupBy &
+                               "HAVING " & comboR & ".EVTR = " & tempEVT & " " &
+                               "ORDER BY " & orderNameOrNumber & ", " & comboR & ".DIST"
+                    Else
+                        MsgBox(lutNum & " #: " & tempEVT & " does not exist in the Managament Unit" & vbCrLf &
+                               "Try another " & lutNum & " #")
+                        tempEVT = "False"
+                    End If
+                Loop
+
+                'Empty input: original assigns no SQL on this path and falls through with
+                'whatever strSQL currently holds. Preserved — see notes.
+                Return strSQL
+
+            Case Else   'By Specific Disturbance Type
+                Return selectFrom &
+                       "INNER JOIN LUT_DistCode ON " & comboR & ".DIST = LUT_DistCode.DistCode " &
+                       groupBy.TrimEnd() & ", LUT_DistCode.Type " &
+                       "HAVING LUT_DistCode.Type = " & SqlLiteral(cmbSortRules.Text) & " " &
+                       "ORDER BY " & orderNameOrNumber
+        End Select
+    End Function
 
     Private Sub cmbSortRules_SelectionChangeCommitted(ByVal sender As Object, ByVal e As System.EventArgs) Handles cmbSortRules.SelectionChangeCommitted
         OrderAndSortEVT()

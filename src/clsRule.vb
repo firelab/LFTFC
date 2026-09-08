@@ -1,4 +1,6 @@
 ﻿Imports System.Data
+Imports System.Data.SQLite
+Imports System.IO
 
 Public Class clsRule
     Private varId, varEVT, varDist, varStrCovLow, varStrCovHigh, varStrHgtLow, varStrHgtHigh, varBPS, varWildcard,
@@ -17,6 +19,7 @@ Public Class clsRule
                    ByVal CBD13 As String, ByVal CBD40 As String, ByVal CBH13 As String, ByVal CBH40 As String,
                    ByVal OnOff As String, ByVal Notes As String, ByVal PixelCount As String, ByVal ComboTable As String,
                    ByVal RulesTable As String, ByRef EVTPixelCountCollection As Collection, ByVal ProjPath As String)
+
         'Assign values to object variables
         strProjectPath = ProjPath
         comboR = ComboTable
@@ -373,104 +376,118 @@ Public Class clsRule
     End Property
 
     Public Sub UpdateDB(ByVal strField As String, ByVal strValue As String)             'Updates DB with a single value
-        Dim dbconn As New ADODB.Connection                                              'DB connection
+
+        Dim dbPath As String = Path.Combine(gs_ProjectPath, gs_LFTFCSQliteName)
+        Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
+
         Try
-            dbconn.ConnectionString = gs_DBConnection &
-            strProjectPath & "\" & gs_LFTFCDBName
-            dbconn.Open()
+            ' MsgBox("in UpdateDB with - " & strField & " strValue: " & strValue & " Id: " & Id)
+            Using conn As New SQLite.SQLiteConnection(connString)
+                conn.Open()
 
-            strSQL = "Update " & rulesR & " " &
-                     "SET " & strField & " = '" & strValue & "'" &
+                strSQL = "Update " & rulesR & " " &
+                     "Set " & strField & " = '" & strValue & "'" &
                      " WHERE Id = " & Id
-            dbconn.Execute(strSQL)
+                Using cmd As New SQLite.SQLiteCommand(strSQL, conn)
 
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
+                    cmd.ExecuteNonQuery()
+
+                End Using
+            End Using
 
         Catch ex As Exception
-
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
 
             MsgBox("Error in UpdateDB - " & ex.Message)
         End Try
     End Sub
 
-    Public Sub CalcPixels(ByVal EVTNum As String, ByVal DistNum As String, ByRef EVTPixelCountCollection As Collection)
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
+    Public Sub CalcPixels(ByVal EVTNum As String,
+                      ByVal DistNum As String,
+                      ByRef EVTPixelCountCollection As Collection)
 
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+        'If the rule is Off → reset values and exit
+        If OnOff <> "On" Then
+            PixelCount = ""
+            Acres = ""
+            Exit Sub
+        End If
+
+        Dim dbPath As String = Path.Combine(strProjectPath, gs_LFTFCSQliteName)
+        Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
 
         Try
-            If OnOff = "On" Then 'Calculate pixels but leave empty if "Off"
-                'Declare variables
-                Dim strTmpCnt As String 'Stores Temp pixel count
+            Using conn As New SQLiteConnection(connString)
+                conn.Open()
 
-                'Assign Variables
-                'This SQL gets all values and count from CMB table that match the rule
-                If IsNumeric(BPS) Then 'Me.BPS is a number and does not equal "any"
-                    strSQL = "SELECT EVTR, DIST, SUM(COUNT) AS SumOfCount FROM " & comboR & " WHERE " &
-                        "(EVTR = " & EVTNum & " And " &
-                        "DIST = " & DistNum & " And " &
-                        "EVCR Between " & IntCovLow & " And " & IntCovHigh & " And " &
-                        "EVHR Between " & IntHgtLow & " And " & IntHgtHigh & " And " &
-                        "BPSRF = " & BPS & " And Wildcard = '" & Wildcard & "')" &
-                        " Or " &
-                        "(EVTR = " & EVTNum & " And " &
-                        "DIST = " & DistNum & " And " &
-                        "EVCR Between " & IntCovLow & " And " & IntCovHigh & " And " &
-                        "EVHR Between " & IntHgtLow & " And " & IntHgtHigh & " And " &
-                        "BPSRF = " & BPS & " And '" & Wildcard & "' = 'any')" &
-                        " GROUP BY EVTR, DIST"
-                Else 'Me. BPS is a string and equals "any"
-                    strSQL = "SELECT EVTR,SUM(COUNT) AS SumOfCount FROM " & comboR & " WHERE " &
-                        "(EVTR = " & EVTNum & " And " &
-                        "DIST = " & DistNum & " And " &
-                        "EVCR Between " & IntCovLow & " And " & IntCovHigh & " And " &
-                        "EVHR Between " & IntHgtLow & " And " & IntHgtHigh & " And '" &
-                        BPS & "' = 'any' And Wildcard = '" & Wildcard & "')" &
-                        " Or " &
-                        "(EVTR = " & EVTNum & " And " &
-                        "DIST = " & DistNum & " And " &
-                        "EVCR Between " & IntCovLow & " And " & IntCovHigh & " And " &
-                        "EVHR Between " & IntHgtLow & " And " & IntHgtHigh & " And '" &
-                        BPS & "' = 'any' And '" & Wildcard & "' = 'any')" &
-                        " GROUP BY EVTR, DIST"
-                End If
-                rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                '-------------------------------------------------------
+                ' Build SQL with parameters
+                '-------------------------------------------------------
+                Dim sql As New Text.StringBuilder()
 
-                'Checks to see if Pixel count is null if it is the pixel count gets a zero or EOF
-                If IsNothing(rs1.Fields!SumOfCount) = False And rs1.EOF = False Then
-                    strTmpCnt = rs1.Fields!SumOfCount.Value & ""
+                sql.Append("SELECT SUM(COUNT) AS SumOfCount FROM ")
+                sql.Append(comboR)
+                sql.Append(" WHERE EVTR = @EVT AND DIST = @DIST ")
+                sql.Append(" AND EVCR BETWEEN @CovLow AND @CovHigh ")
+                sql.Append(" AND EVHR BETWEEN @HgtLow AND @HgtHigh ")
 
-                    PixelCount = strTmpCnt 'Set the count of the pixels
+                'Wildcard and BPS logic
+                If IsNumeric(BPS) Then
+                    'Case 1: BPS = number
+                    sql.Append(" AND BPSRF = @BPS ")
+                    If Wildcard = "any" Then
+                        sql.Append(" AND @Wildcard = 'any' ")
+                    Else
+                        sql.Append(" AND Wildcard = @Wildcard ")
+                    End If
+
                 Else
-                    PixelCount = 0
+                    'Case 2: BPS = "any"
+                    sql.Append(" AND @BPS = 'any' ")
+
+                    If Wildcard = "any" Then
+                        sql.Append(" AND @Wildcard = 'any' ")
+                    Else
+                        sql.Append(" AND Wildcard = @Wildcard ")
+                    End If
                 End If
 
-                CalcAcresAndPercent(EVTPixelCountCollection) 'Calculates acres and percent evt
-            Else 'Clear the pixel count and acres because it is turned off
-                PixelCount = ""
-                Acres = ""
-            End If
+                sql.Append(" GROUP BY EVTR, DIST ")
 
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
+                '-------------------------------------------------------
+                ' Execute parameterized query
+                '-------------------------------------------------------
+                Using cmd As New SQLiteCommand(sql.ToString(), conn)
 
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
+                    cmd.Parameters.AddWithValue("@EVT", EVTNum)
+                    cmd.Parameters.AddWithValue("@DIST", DistNum)
+                    cmd.Parameters.AddWithValue("@CovLow", IntCovLow)
+                    cmd.Parameters.AddWithValue("@CovHigh", IntCovHigh)
+                    cmd.Parameters.AddWithValue("@HgtLow", IntHgtLow)
+                    cmd.Parameters.AddWithValue("@HgtHigh", IntHgtHigh)
+                    cmd.Parameters.AddWithValue("@Wildcard", Wildcard)
+                    cmd.Parameters.AddWithValue("@BPS", BPS)
+
+                    Using rd As SQLiteDataReader = cmd.ExecuteReader()
+                        If rd.Read() AndAlso Not rd.IsDBNull(0) Then
+                            PixelCount = rd.GetInt64(0).ToString()
+                        Else
+                            PixelCount = "0"
+                        End If
+                    End Using
+
+                End Using
+
+            End Using
+
+            '-------------------------------------------------------
+            ' Compute acres + percent (your existing logic)
+            '-------------------------------------------------------
+            CalcAcresAndPercent(EVTPixelCountCollection)
+
         Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-
             MsgBox("Error in CalcPixels - " & ex.Message)
         End Try
+
     End Sub
 
     Public Sub CalcAcresAndPercent(ByRef EVTPixelCountCollection As Collection)

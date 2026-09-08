@@ -32,25 +32,6 @@ Friend Class BRule
                                         gs_MU() + "_Rulesets",
                                         gs_MU())
 
-            '' Hide before running python
-            'FUELRule.Hide()
-
-            '' Toolbox Parameters
-            'Dim myParams As New List(Of String)
-            'myParams.Add(strProjectPath) ' project path
-            'myParams.Add(MU) ' mu
-
-            'Dim tool As String = "Rules_Setup"
-            'Dim thetool As String = Path.Combine(gs_toolboxpath, tool)
-
-            '' Run shared python call
-            'Await gt_PixelPYT(thetool, myParams, gs_MU())
-
-            ''Open Create Fuel GRID
-            'FUELRule.Show()
-
-
-
             ' Run async initialization AFTER constructed
             Await FUELRule.StartAsync()
 

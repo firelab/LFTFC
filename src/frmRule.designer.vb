@@ -182,10 +182,10 @@ Partial Class frmRule
         DistributionGraph.Controls.Add(lblWildcard)
         DistributionGraph.Controls.Add(cmbBPSGraph)
         DistributionGraph.Controls.Add(lblBPS)
-        DistributionGraph.Location = New System.Drawing.Point(4, 32)
+        DistributionGraph.Location = New System.Drawing.Point(4, 24)
         DistributionGraph.Name = "DistributionGraph"
         DistributionGraph.Padding = New Padding(3)
-        DistributionGraph.Size = New System.Drawing.Size(825, 454)
+        DistributionGraph.Size = New System.Drawing.Size(825, 462)
         DistributionGraph.TabIndex = 1
         DistributionGraph.Text = "Distribution Graph"
         DistributionGraph.UseVisualStyleBackColor = True
@@ -483,10 +483,10 @@ Partial Class frmRule
         ' CompareFM
         ' 
         CompareFM.BackColor = Drawing.Color.Transparent
+        CompareFM.Controls.Add(cmdCustomFM)
         CompareFM.Controls.Add(grpLiveFuelMoist)
         CompareFM.Controls.Add(grpDeadFuelMoist)
         CompareFM.Controls.Add(grpROSFL)
-        CompareFM.Controls.Add(cmdCustomFM)
         CompareFM.Controls.Add(cmbSlope)
         CompareFM.Controls.Add(lblSlope)
         CompareFM.Controls.Add(cmbFM4)
@@ -494,9 +494,9 @@ Partial Class frmRule
         CompareFM.Controls.Add(cmbFM2)
         CompareFM.Controls.Add(cmbFM1)
         CompareFM.Controls.Add(lblFuelModel)
-        CompareFM.Location = New System.Drawing.Point(4, 32)
+        CompareFM.Location = New System.Drawing.Point(4, 24)
         CompareFM.Name = "CompareFM"
-        CompareFM.Size = New System.Drawing.Size(825, 454)
+        CompareFM.Size = New System.Drawing.Size(825, 462)
         CompareFM.TabIndex = 1
         CompareFM.Text = "Compare FM"
         ' 
@@ -792,7 +792,7 @@ Partial Class frmRule
         grpCustFM.Controls.Add(rdo10H)
         grpCustFM.Controls.Add(rdo1H)
         grpCustFM.Font = New System.Drawing.Font("Comic Sans MS", 8.25F)
-        grpCustFM.Location = New System.Drawing.Point(2, 4)
+        grpCustFM.Location = New System.Drawing.Point(112, 78)
         grpCustFM.Name = "grpCustFM"
         grpCustFM.Size = New System.Drawing.Size(797, 111)
         grpCustFM.TabIndex = 121
@@ -1334,8 +1334,6 @@ Partial Class frmRule
         AutoSizeMode = AutoSizeMode.GrowAndShrink
         ClientSize = New System.Drawing.Size(944, 578)
         Controls.Add(grpCustFM)
-        Controls.Add(grpSort)
-        Controls.Add(grpEVTOrder)
         Controls.Add(lblDistCode)
         Controls.Add(cmdAutoRule)
         Controls.Add(txtSessionName)
@@ -1345,6 +1343,8 @@ Partial Class frmRule
         Controls.Add(cmdAddRule)
         Controls.Add(TabControl)
         Controls.Add(cmbEVT)
+        Controls.Add(grpEVTOrder)
+        Controls.Add(grpSort)
         Font = New System.Drawing.Font("Comic Sans MS", 12F)
         Icon = CType(resources.GetObject("$this.Icon"), Drawing.Icon)
         Margin = New Padding(5)

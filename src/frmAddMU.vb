@@ -1,4 +1,6 @@
-﻿Imports ArcGIS.Core.Data
+﻿Imports System.Data.SQLite
+Imports System.IO
+Imports ArcGIS.Core.Data
 Imports ArcGIS.Core.Data.Raster
 Imports ArcGIS.Desktop.Catalog
 Imports ArcGIS.Desktop.Core
@@ -32,286 +34,358 @@ Public Class frmAddMU
         End If
     End Sub
 
-    Private Sub CopyTableToAccess(ByVal rasPath As String, ByVal rasName As String, ByVal IsGRID As Boolean) 'Copies ITable to Access in the correct format
+    Private Sub CopyTableToSQLite(rasPath As String, rasName As String, IsGRID As Boolean)
 
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
+        ' SQLite database
+        Dim dbPath As String = Path.Combine(strProjectPath, gs_LFTFCSQliteName)
+        Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
 
-        dbconn.Open()
+        ' Open raster datastore
+        Dim connectionPath As New FileSystemConnectionPath(New Uri(rasPath), FileSystemDatastoreType.Raster)
+        Dim dataStore As New FileSystemDatastore(connectionPath)
 
-        'Get raster table
-        'Dim strpath = Strings.Left(Item.Path, Strings.Len(Item.Path) - Strings.Len(Item.Name))
-        Dim connectionPath = New FileSystemConnectionPath(New System.Uri(rasPath), FileSystemDatastoreType.Raster)
-        Dim dataStore = New FileSystemDatastore(connectionPath)
         Dim rasDS As RasterDataset
-        If IsGRID = False Then
+        If Not IsGRID Then
             rasDS = dataStore.OpenDataset(Of RasterDataset)(rasName & ".tif")
         Else
             rasDS = dataStore.OpenDataset(Of RasterDataset)(rasName)
         End If
 
         Dim rasBand = rasDS.GetBand(0)
-        Dim rasTable = rasBand.GetAttributeTable
+        Dim rasTable = rasBand.GetAttributeTable()
         Dim pCursor = rasTable.Search()
 
         Try
-            'Add Data Name to DATA_MU_Name Table
-            strSQL = "INSERT INTO DATA_MU_Name " &
-                     "VALUES ('" & rasName & "')"
-            dbconn.Execute(strSQL)
+            Using conn As New SQLiteConnection(connString)
+                conn.Open()
 
-            'Create Management Unit table in access to store new combo grid
-            strSQL = "CREATE TABLE " & rasName & "_CMB " &
-                               "( [VALUE] int, [COUNT] int, EVTR int, DIST int, EVCR int, EVHR int, BPSRF int, WILDCARD text(255), " &
-                               "NewFBFM13 int, NewFBFM40 int, NewCanFM int, NewFCCS int, " &
-                               "NewFLM int, NewCCover int, NewCHeight int, " &
-                               "NewCBH13mx10 int, NewCBH40mx10 int, NewCBD13x100 int, " &
-                               "NewCBD40x100 int, NewCanopy int )"
-            dbconn.Execute(strSQL)
+                ' --------------------------------------------------------------
+                ' New Management Unit (MU) name into DATA_MU_Name
+                ' --------------------------------------------------------------
+                Using cmd As New SQLiteCommand("INSERT INTO DATA_MU_Name (Name) VALUES (@nm)", conn)
+                    cmd.Parameters.AddWithValue("@nm", rasName)
+                    cmd.ExecuteNonQuery()
+                End Using
 
-            'Create new Rulesets table in access for the new Management Unit
-            strSQL = "CREATE TABLE " & rasName & "_Rulesets " &
-                               "( ID AUTOINCREMENT, EVT int, DIST int, Cover_Low int, Cover_High int, Height_Low int, " &
-                               "Height_High int, BPSRF text, Wildcard text(255), FBFM13 int, FBFM40 text, CanFM text, FCCS int, " &
-                               "FLM int, CCover int, CHeight int, CBD13x100 int, CBD40x100 int, CBH13mx10 int, CBH40mx10 int, " &
-                               "Canopy int, OnOff text, Notes Memo, PixelCount text )"
-            dbconn.Execute(strSQL)
+                ' --------------------------------------------------------------
+                ' CREATE CMB TABLE
+                ' --------------------------------------------------------------
+                Dim cmbTable As String = rasName & "_CMB"
 
-            Dim i As Integer                                                'Index for column identifier in pRow
-            i = 1
+                Dim sqlCreateCMB As String =
+                "CREATE TABLE IF NOT EXISTS " & cmbTable & " (" &
+                "VALUE INTEGER, COUNT INTEGER, EVTR INTEGER, DIST INTEGER, EVCR INTEGER, EVHR INTEGER, " &
+                "BPSRF INTEGER, WILDCARD TEXT, " &
+                "NewFBFM13 INTEGER, NewFBFM40 INTEGER, NewCanFM INTEGER, NewFCCS INTEGER, NewFLM INTEGER, " &
+                "NewCCover INTEGER, NewCHeight INTEGER, NewCBH13mx10 INTEGER, NewCBH40mx10 INTEGER, " &
+                "NewCBD13x100 INTEGER, NewCBD40x100 INTEGER, NewCanopy INTEGER)"
 
-            rs1.CursorLocation = ADODB.CursorLocationEnum.adUseClient           '<<<< important!
+                Using cmd As New SQLiteCommand(sqlCreateCMB, conn)
+                    cmd.ExecuteNonQuery()
+                End Using
 
-            'strSQL = "SELECT " & rasName & "_CMB " & ".* FROM " & rasName & "_CMB"
+                ' --------------------------------------------------------------
+                ' CREATE RULESETS TABLE
+                ' --------------------------------------------------------------
+                Dim rulesTable As String = rasName & "_Rulesets"
 
-            'rs1.Open(rasName & "_CMB ", dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-            rs1.Open(rasName & "_CMB ", dbconn, ADODB.CursorTypeEnum.adOpenForwardOnly, ADODB.LockTypeEnum.adLockBatchOptimistic)
+                Dim sqlCreateRules As String =
+                "CREATE TABLE IF NOT EXISTS " & rulesTable & " (" &
+                "ID INTEGER PRIMARY KEY AUTOINCREMENT, " &
+                "EVT INTEGER, DIST INTEGER, Cover_Low INTEGER, Cover_High INTEGER, " &
+                "Height_Low INTEGER, Height_High INTEGER, BPSRF TEXT, Wildcard TEXT, " &
+                "FBFM13 INTEGER, FBFM40 TEXT, CanFM TEXT, FCCS INTEGER, FLM INTEGER, " &
+                "CCover INTEGER, CHeight INTEGER, CBD13x100 INTEGER, CBD40x100 INTEGER, " &
+                "CBH13mx10 INTEGER, CBH40mx10 INTEGER, Canopy INTEGER, OnOff TEXT, Notes TEXT, PixelCount TEXT)"
 
-            Dim pRow As Row = Nothing
-            While pCursor.MoveNext
-                pRow = pCursor.Current()
-                With rs1
-                    .AddNew()
+                Using cmd As New SQLiteCommand(sqlCreateRules, conn)
+                    cmd.ExecuteNonQuery()
+                End Using
 
-                    .Fields("VALUE").Value = pRow.Item(i)
-                    i += 1
-                    .Fields("COUNT").Value = pRow.Item(i)
-                    i += 1
-                    .Fields("EVTR").Value = pRow.Item(i)
-                    i += 1
-                    If txtDistPath.Text.Contains(":\") = False Then
-                        .Fields("DIST").Value = "0"
-                    Else
-                        .Fields("DIST").Value = pRow.Item(i)
-                        i += 1
-                    End If
-                    .Fields("EVCR").Value = pRow.Item(i)
-                    i += 1
-                    .Fields("EVHR").Value = pRow.Item(i)
-                    i += 1
-                    .Fields("BPSRF").Value = pRow.Item(i)
-                    i += 1
-                    If txtWildPath.Text.Contains(":\") = False Then
-                        .Fields("WILDCARD").Value = "None"
-                    Else
-                        .Fields("WILDCARD").Value = pRow.Item(i)
-                    End If
-                    .Fields("NewFBFM13").Value = 9999
-                    .Fields("NewFBFM40").Value = 9999
-                    .Fields("NewCanFM").Value = 9999
-                    .Fields("NewFCCS").Value = 9999
-                    .Fields("NewFLM").Value = 9999
-                    .Fields("NewCCover").Value = 9999
-                    .Fields("NewCHeight").Value = 9999
-                    .Fields("NewCBH13mx10").Value = 9999
-                    .Fields("NewCBH40mx10").Value = 9999
-                    .Fields("NewCBD13x100").Value = 9999
-                    .Fields("NewCBD40x100").Value = 9999
-                    .Fields("NewCanopy").Value = 9999
-                    i = 1 'Reset i back to 1 to start over at the first field
-                End With
-            End While
+                ' --------------------------------------------------------------
+                ' INSERT FOR BATCH INSERTION
+                ' --------------------------------------------------------------
+                Dim insertSQL As String =
+                "INSERT INTO " & cmbTable & " (" &
+                "VALUE, COUNT, EVTR, DIST, EVCR, EVHR, BPSRF, WILDCARD, " &
+                "NewFBFM13, NewFBFM40, NewCanFM, NewFCCS, NewFLM, " &
+                "NewCCover, NewCHeight, NewCBH13mx10, NewCBH40mx10, " &
+                "NewCBD13x100, NewCBD40x100, NewCanopy) " &
+                "VALUES (@v, @cnt, @evtr, @dist, @evcr, @evhr, @bps, @wild, " &
+                "@fb13, @fb40, @canfm, @fccs, @flm, @ccover, @cheight, " &
+                "@cbh13, @cbh40, @cbd13, @cbd40, @canopy)"
 
-            rs1.UpdateBatch()
+                ' --------------------------------------------------------------
+                ' BATCH INSERT TRANSACTION
+                ' --------------------------------------------------------------
+                Using tran As SQLiteTransaction = conn.BeginTransaction()
+                    Using insertCmd As New SQLiteCommand(insertSQL, conn, tran)
 
-            If rs1.State <> 0 Then rs1.Close() 'Recordset needs to be closed
-            rs1 = Nothing
+                        Dim pRow As Row
 
-            If dbconn.State <> System.Data.ConnectionState.Closed Then                                 'Database needs to be closed
-                dbconn = Nothing
-            End If
+                        While pCursor.MoveNext()
+
+                            pRow = pCursor.Current()
+
+                            insertCmd.Parameters.Clear()
+
+                            Dim i As Integer = 1
+
+                            insertCmd.Parameters.AddWithValue("@v", pRow.Item(i)) : i += 1
+                            insertCmd.Parameters.AddWithValue("@cnt", pRow.Item(i)) : i += 1
+                            insertCmd.Parameters.AddWithValue("@evtr", pRow.Item(i)) : i += 1
+
+                            ' DIST logic: depends on user path
+                            If txtDistPath.Text.Contains(":\") Then
+                                insertCmd.Parameters.AddWithValue("@dist", pRow.Item(i)) : i += 1
+                            Else
+                                insertCmd.Parameters.AddWithValue("@dist", 0)
+                            End If
+
+                            insertCmd.Parameters.AddWithValue("@evcr", pRow.Item(i)) : i += 1
+                            insertCmd.Parameters.AddWithValue("@evhr", pRow.Item(i)) : i += 1
+                            insertCmd.Parameters.AddWithValue("@bps", pRow.Item(i)) : i += 1
+
+                            ' WILDCARD logic
+                            If txtWildPath.Text.Contains(":\") Then
+                                insertCmd.Parameters.AddWithValue("@wild", pRow.Item(i))
+                            Else
+                                insertCmd.Parameters.AddWithValue("@wild", "None")
+                            End If
+
+                            ' Default values — now from shared constant
+                            insertCmd.Parameters.AddWithValue("@fb13", DEFAULT_FUEL_VAL)
+                            insertCmd.Parameters.AddWithValue("@fb40", DEFAULT_FUEL_VAL)
+                            insertCmd.Parameters.AddWithValue("@canfm", DEFAULT_FUEL_VAL)
+                            insertCmd.Parameters.AddWithValue("@fccs", DEFAULT_FUEL_VAL)
+                            insertCmd.Parameters.AddWithValue("@flm", DEFAULT_FUEL_VAL)
+                            insertCmd.Parameters.AddWithValue("@ccover", DEFAULT_FUEL_VAL)
+                            insertCmd.Parameters.AddWithValue("@cheight", DEFAULT_FUEL_VAL)
+                            insertCmd.Parameters.AddWithValue("@cbh13", DEFAULT_FUEL_VAL)
+                            insertCmd.Parameters.AddWithValue("@cbh40", DEFAULT_FUEL_VAL)
+                            insertCmd.Parameters.AddWithValue("@cbd13", DEFAULT_FUEL_VAL)
+                            insertCmd.Parameters.AddWithValue("@cbd40", DEFAULT_FUEL_VAL)
+                            insertCmd.Parameters.AddWithValue("@canopy", DEFAULT_FUEL_VAL)
+
+                            insertCmd.ExecuteNonQuery()
+
+                        End While
+
+                    End Using
+
+                    tran.Commit()
+                End Using
+
+            End Using
+
         Catch ex As Exception
-            If dbconn.State <> System.Data.ConnectionState.Closed Then                                 'Database needs to be closed
-                dbconn = Nothing
-            End If
-            MsgBox("Error in CopyTableToAccess - " & ex.Message)
+            MsgBox("Error in CopyTableToSQLite - " & ex.Message)
         End Try
-        pCursor.Dispose()                                                                          'Dispose of the table cursor
+
+        ' cleanup raster resources
+        pCursor.Dispose()
         rasTable.Dispose()
+
     End Sub
 
-    Private Sub Update_LUT_BPS(ByVal rasTable As Table) 'Copies ITable to Access in the correct format
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
-        Dim rs2 As New ADODB.Recordset                                  'recordset for data
+    Private Sub Update_LUT_BPS(ByVal rasTable As Table)
 
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+        Dim dbPath As String = Path.Combine(strProjectPath, gs_LFTFCSQliteName)
+        Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
 
         Dim rasCursor = rasTable.Search()
         Dim rasRow As Row = Nothing
+
         Try
-            Dim BPSField, BPS_CodeField, BPS_ModelField As Integer
-            Dim BPS_NameField As Integer
-            Dim BPS_CodeValue, BPS_ModelValue As Integer
+            ' Locate raster fields
+            Dim BPSField As Integer = 1  'first column (VALUE)
+            Dim BPS_CodeField As Integer = rasCursor.FindField("BPS_CODE")
+            Dim BPS_ModelField As Integer = rasCursor.FindField("BPS_MODEL")
+            Dim BPS_NameField As Integer = rasCursor.FindField("BPS_NAME")
 
-            BPSField = 1                                         'BPS Field which is the value field
-            BPS_CodeField = rasCursor.FindField("BPS_CODE")    'BPS_Code Field
-            BPS_ModelField = rasCursor.FindField("BPS_MODEL")  'BPS_Model Field
-            BPS_NameField = rasCursor.FindField("BPS_NAME")    'BPS_Name Field
+            If BPSField <> -1 AndAlso
+                BPS_CodeField <> -1 AndAlso
+                BPS_ModelField <> -1 AndAlso
+                BPS_NameField <> -1 Then
 
-            If BPSField <> -1 And BPS_CodeField <> -1 And BPS_ModelField <> -1 And BPS_NameField <> -1 Then
-                'We have the fields needed to update the EVT_EVG_EVS table
-                While rasCursor.MoveNext
-                    rasRow = rasCursor.Current
-                    BPS_CodeValue = 9999
-                    BPS_ModelValue = 9999
-                    If IsNumeric(rasRow.Item(BPS_CodeField)) Then BPS_CodeValue = rasRow.Item(BPS_CodeField)
-                    If IsNumeric(rasRow.Item(BPS_ModelField)) Then BPS_ModelValue = rasRow.Item(BPS_ModelField)
+                Using conn As New SQLiteConnection(connString)
+                    conn.Open()
 
-                    strSQL = "SELECT LUT_BPS.BPS " &
-                             "FROM(LUT_BPS) " &
-                             "GROUP BY LUT_BPS.BPS " &
-                             "HAVING (((LUT_BPS.BPS)=" & rasRow.Item(BPSField) & "))"
-                    rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                    ' Loop all raster rows
+                    While rasCursor.MoveNext()
 
-                    If rs1.EOF = False Then 'Update the values for this BPS
+                        rasRow = rasCursor.Current
 
-                        strSQL = "UPDATE LUT_BPS " &
-                                 "SET LUT_BPS.BPS_Code = """ & BPS_CodeValue & """, " &
-                                 "LUT_BPS.BPS_Model = " & BPS_ModelValue & ", " &
-                                 "LUT_BPS.Name = """ & rasRow.Item(BPS_NameField) & """ " &
-                                 "WHERE (((LUT_BPS.BPS)=" & rasRow.Item(BPSField) & "))"
-                        dbconn.Execute(strSQL)
-                    Else                  'Append a new BPS with values
-                        strSQL = "INSERT INTO LUT_BPS ( BPS, BPS_Code, BPS_Model, Name ) " &
-                                 "SELECT " & rasRow.Item(BPSField) & " AS Expr1, """ &
-                                 BPS_CodeValue & """ AS Expr2, " &
-                                 BPS_ModelValue & " AS Expr3, """ &
-                                 rasRow.Item(BPS_NameField) & """ AS Expr4 "
-                        dbconn.Execute(strSQL)
-                    End If
+                        Dim bpsValue As Integer = CInt(rasRow.Item(BPSField))
+                        Dim bpsCodeValue As Integer = If(IsNumeric(rasRow.Item(BPS_CodeField)),
+                                                     CInt(rasRow.Item(BPS_CodeField)),
+                                                     DEFAULT_FUEL_VAL)
 
-                    rs1.Close()
-                End While
+                        Dim bpsModelValue As Integer = If(IsNumeric(rasRow.Item(BPS_ModelField)),
+                                                      CInt(rasRow.Item(BPS_ModelField)),
+                                                      DEFAULT_FUEL_VAL)
+
+                        Dim bpsNameValue As String = rasRow.Item(BPS_NameField).ToString()
+
+                        ' ----------------------------------------------------
+                        ' Check whether BPS already exists
+                        ' ----------------------------------------------------
+                        Dim sqlCheck As String =
+                        "SELECT BPS FROM LUT_BPS WHERE BPS = @bps LIMIT 1"
+
+                        Dim exists As Boolean = False
+
+                        Using cmdCheck As New SQLiteCommand(sqlCheck, conn)
+                            cmdCheck.Parameters.AddWithValue("@bps", bpsValue)
+                            Using rd As SQLiteDataReader = cmdCheck.ExecuteReader()
+                                exists = rd.Read()
+                            End Using
+                        End Using
+
+                        ' ----------------------------------------------------
+                        ' Update existing BPS
+                        ' ----------------------------------------------------
+                        If exists Then
+
+                            Dim sqlUpdate As String =
+                            "UPDATE LUT_BPS " &
+                            "SET BPS_Code = @code, " &
+                            "    BPS_Model = @model, " &
+                            "    Name = @name " &
+                            "WHERE BPS = @bps"
+
+                            Using cmdUpdate As New SQLiteCommand(sqlUpdate, conn)
+                                cmdUpdate.Parameters.AddWithValue("@code", bpsCodeValue)
+                                cmdUpdate.Parameters.AddWithValue("@model", bpsModelValue)
+                                cmdUpdate.Parameters.AddWithValue("@name", bpsNameValue)
+                                cmdUpdate.Parameters.AddWithValue("@bps", bpsValue)
+                                cmdUpdate.ExecuteNonQuery()
+                            End Using
+
+                        Else
+                            ' ----------------------------------------------------
+                            ' Insert new BPS record
+                            ' ----------------------------------------------------
+                            Dim sqlInsert As String =
+                            "INSERT INTO LUT_BPS (BPS, BPS_Code, BPS_Model, Name) " &
+                            "VALUES (@bps, @code, @model, @name)"
+
+                            Using cmdInsert As New SQLiteCommand(sqlInsert, conn)
+                                cmdInsert.Parameters.AddWithValue("@bps", bpsValue)
+                                cmdInsert.Parameters.AddWithValue("@code", bpsCodeValue)
+                                cmdInsert.Parameters.AddWithValue("@model", bpsModelValue)
+                                cmdInsert.Parameters.AddWithValue("@name", bpsNameValue)
+                                cmdInsert.ExecuteNonQuery()
+                            End Using
+
+                        End If
+
+                    End While
+                End Using
+
             End If
 
-            If dbconn.State <> System.Data.ConnectionState.Closed Then                                 'Database needs to be closed
-                If rs1.State <> 0 Then rs1.Close()
-                rs1 = Nothing
-                If rs2.State <> 0 Then rs2.Close()
-                rs2 = Nothing
-
-                If dbconn.State <> System.Data.ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-                dbconn = Nothing
-            End If
-            rasTable.Dispose()
-            rasCursor.Dispose()
         Catch ex As Exception
-            If dbconn.State <> System.Data.ConnectionState.Closed Then                                 'Database needs to be closed
-                If rs1.State <> 0 Then rs1.Close()
-                rs1 = Nothing
-                If rs2.State <> 0 Then rs2.Close()
-                rs2 = Nothing
+            MsgBox("Error in Update_LUT_BPS (SQLite) - " & ex.Message)
 
-                If dbconn.State <> System.Data.ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-                dbconn = Nothing
-            End If
-            rasTable.Dispose()
+        Finally
+            ' Clean up raster cursor/table
             rasCursor.Dispose()
-            MsgBox("Error in Update_LUT_BPS - " & ex.Message)
+            rasTable.Dispose()
         End Try
+
     End Sub
 
-    Private Sub Update_EVT_EVG_EVS_w_EVTTable(ByVal rasTable As Table) 'Copies ITable to Access in the correct format
-        'lblStatus.Visible = True
-        'lblStatus.Update()
+    Private Sub Update_EVT_EVG_EVS_w_EVTTable(rasTable As Table)
 
-        Dim EVTField As Integer
-        Dim EVTNameField As Integer
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
-        Dim rs2 As New ADODB.Recordset                                  'recordset for data
-        Dim rs3 As New ADODB.Recordset                                  'recordset for data
-
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+        Dim dbPath As String = Path.Combine(strProjectPath, gs_LFTFCSQliteName)
+        Dim connString As String = "Data Source=" & dbPath & ";Version=3;"
 
         Dim rasCursor = rasTable.Search()
         Dim rasRow As Row = Nothing
+
         Try
-            EVTField = rasCursor.FindField("EVT_FUEL")                        'EVT_Fuel Field
-            If EVTField = -1 Then EVTField = 1 '                            Value Field if old GRID or no attached attributes
-            EVTNameField = rasCursor.FindField("EVT_FUEL_N")                  'EVT Name Field
-            If EVTNameField <> -1 Then
-                'We have the fields needed to update the EVT_EVG_EVS table
-                While rasCursor.MoveNext
-                    rasRow = rasCursor.Current
-                    strSQL = "SELECT XWALK_EVT_EVG_EVS.EVT " &
-                             "FROM(XWALK_EVT_EVG_EVS) " &
-                             "GROUP BY XWALK_EVT_EVG_EVS.EVT " &
-                             "HAVING (((XWALK_EVT_EVG_EVS.EVT)=" & rasRow.Item(EVTField) & "))"
-                    rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+            ' Locate raster fields
+            Dim EVTField As Integer = rasCursor.FindField("EVT_FUEL")
+            If EVTField = -1 Then EVTField = 1     'Fallback to first field for older rasters
 
-                    If rs1.EOF = False Then 'Update the values for this EVT
-
-                        strSQL = "UPDATE XWALK_EVT_EVG_EVS " &
-                                 "SET XWALK_EVT_EVG_EVS.EVT_Name = """ & rasRow.Item(EVTNameField) & """ " &
-                                 "WHERE (((XWALK_EVT_EVG_EVS.EVT)=" & rasRow.Item(EVTField) & "))"
-                        dbconn.Execute(strSQL)
-                    Else                  'Append a new evt with values
-
-                        strSQL = "INSERT INTO XWALK_EVT_EVG_EVS ( EVT, EVT_Name ) " &
-                                 "SELECT " & rasRow.Item(EVTField) & " AS Expr1, """ &
-                                 rasRow.Item(EVTNameField) & """ AS Expr2"
-                        dbconn.Execute(strSQL)
-                    End If
-
-                    rs1.Close()
-                End While
+            Dim EVTNameField As Integer = rasCursor.FindField("EVT_FUEL_N")
+            If EVTNameField = -1 Then
+                'Nothing to update — name field missing
+                rasCursor.Dispose()
+                rasTable.Dispose()
+                Exit Sub
             End If
 
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-            If rs2.State <> 0 Then rs2.Close()
-            rs2 = Nothing
-            If rs3.State <> 0 Then rs3.Close()
-            rs3 = Nothing
+            Using conn As New SQLiteConnection(connString)
+                conn.Open()
 
-            If dbconn.State <> System.Data.ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
+                'Loop over raster attribute rows
+                While rasCursor.MoveNext()
 
-            rasTable.Dispose()
-            rasCursor.Dispose()
+                    rasRow = rasCursor.Current()
+
+                    Dim evtValue As Integer = CInt(rasRow.Item(EVTField))
+                    Dim evtName As String = rasRow.Item(EVTNameField).ToString()
+
+                    ' ----------------------------------------------------------
+                    ' Check if EVT already exists in XWALK_EVT_EVG_EVS
+                    ' ----------------------------------------------------------
+                    Dim exists As Boolean = False
+                    Dim sqlCheck As String =
+                    "SELECT EVT FROM XWALK_EVT_EVG_EVS WHERE EVT = @evt LIMIT 1"
+
+                    Using cmdCheck As New SQLiteCommand(sqlCheck, conn)
+                        cmdCheck.Parameters.AddWithValue("@evt", evtValue)
+                        Using rd As SQLiteDataReader = cmdCheck.ExecuteReader()
+                            exists = rd.Read()
+                        End Using
+                    End Using
+
+                    ' ----------------------------------------------------------
+                    ' UPDATE EXISTING EVT NAME
+                    ' ----------------------------------------------------------
+                    If exists Then
+
+                        Dim sqlUpdate As String =
+                        "UPDATE XWALK_EVT_EVG_EVS " &
+                        "SET EVT_Name = @name " &
+                        "WHERE EVT = @evt"
+
+                        Using cmdUpdate As New SQLiteCommand(sqlUpdate, conn)
+                            cmdUpdate.Parameters.AddWithValue("@name", evtName)
+                            cmdUpdate.Parameters.AddWithValue("@evt", evtValue)
+                            cmdUpdate.ExecuteNonQuery()
+                        End Using
+
+                    Else
+                        ' ----------------------------------------------------------
+                        ' INSERT NEW EVT RECORD
+                        ' ----------------------------------------------------------
+                        Dim sqlInsert As String =
+                        "INSERT INTO XWALK_EVT_EVG_EVS (EVT, EVT_Name) " &
+                        "VALUES (@evt, @name)"
+
+                        Using cmdInsert As New SQLiteCommand(sqlInsert, conn)
+                            cmdInsert.Parameters.AddWithValue("@evt", evtValue)
+                            cmdInsert.Parameters.AddWithValue("@name", evtName)
+                            cmdInsert.ExecuteNonQuery()
+                        End Using
+
+                    End If
+
+                End While
+
+            End Using
+
         Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-            If rs2.State <> 0 Then rs2.Close()
-            rs2 = Nothing
-            If rs3.State <> 0 Then rs3.Close()
-            rs3 = Nothing
+            MsgBox("Error in Update_EVT_EVG_EVS_w_EVTTable (SQLite) - " & ex.Message)
 
-            If dbconn.State <> System.Data.ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-
-            MsgBox("Error in Update_EVT_EVG_EVS_w_EVTTable - " & ex.Message)
-            rasTable.Dispose()
+        Finally
             rasCursor.Dispose()
+            rasTable.Dispose()
         End Try
+
     End Sub
 
     Private Async Sub GetRasterPath(pControl As System.Windows.Forms.Control) 'Set the control with the selected files path
@@ -386,10 +460,6 @@ Public Class frmAddMU
 
         cmdCreateMU.Enabled = False
         cmdCreateMU.Text = "Wait"
-
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection & strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
 
         Dim strName As String                                           'Short MU name for ASP ELV and SLP
 
@@ -551,7 +621,7 @@ Public Class frmAddMU
                    'Copy Table to access
                    frmWork.UpdateStatus("Copy MU table to database")
 
-                   CopyTableToAccess(gs_ProjectPath + "\MU\", MUSaveName, blnMUGRID)
+                   CopyTableToSQLite(gs_ProjectPath + "\MU\", MUSaveName, blnMUGRID)
 
                    'Add one to the count to trigger and update change
                    gs_MUCount += 1

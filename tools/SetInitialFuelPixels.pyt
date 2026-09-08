@@ -7,11 +7,15 @@ import numpy as np
 import arcpy
 import time
 import ctypes
+import pathlib
+import re
 
-from sqlalchemy import create_engine, text, inspect
+from sqlalchemy import create_engine, text, inspect, select
 from sqlalchemy.engine import URL
-#from contextlib import closing
-#from pathlib import Path
+from sqlalchemy.orm import Session
+from sqlalchemy import MetaData, Table
+from contextlib import closing
+from pathlib import Path
 #from numpy import nan
 
 #from dataclasses import dataclass, field
@@ -24,7 +28,7 @@ class Toolbox(object):
     def __init__(self):
         self.label = "Toolbox Name"
         self.alias = "Toolbox Alias"
-        self.tools = [Rules_Setup]
+        self.tools = [Rules_Setup, Clear_Selected_MU, export_sqlite_to_csv, import_csv_to_sqlite]
 
 class Rules_Setup(object):
     def __init__(self):
@@ -37,7 +41,66 @@ class Rules_Setup(object):
         proj_path = arcpy.Parameter(
             displayName="Selected Project Path",
             name="in_projpath",
+            datatype="DEFolder",
+            parameterType="Required",
+            direction="Input"
+        )
+        mu = arcpy.Parameter(
+            displayName="Selected MU",
+            name="in_mu",
             datatype="GPString",
+            parameterType="Required",
+            direction="Input"
+        )
+
+        proj_path.value = r"E:\e_GIS\LFTFC\Test_Data_Set"
+        mu.value = "G_TestData_MU"
+
+        return [proj_path, mu]
+
+    def isLicensed(self):
+        return True
+
+    def updateParameters(self, parameters):
+        return
+
+    def updateMessages(self, parameters):
+        if parameters[0].value:
+            try:
+                db_url = f"sqlite:///{parameters[0].ValueAsText}//LFTFC_new.sqlite"
+                engine = create_engine(db_url)
+                metadata = MetaData()
+                namtab = Table("DATA_MU_Name", metadata, autoload_with=engine)
+                with engine.connect() as conn:
+                    statement = sqlalchemy.select(namtab.c.Name)
+                    tablesall = conn.execute(statement).all()
+                    tables = [row[0] for row in tablesall]
+                    tables.sort()
+                engine.dispose()
+                parameters[1].filter.list = tables
+            except Exception as e:
+                arcpy.AddWarning(f"Could not read database: {e}")
+                parameters[1].filter.list = []
+        return
+
+    def execute(self, parameters, messages):
+        proj_path = parameters[0].valueAsText
+        mu = parameters[1].valueAsText
+        
+        count_pixels(proj_path, mu)
+
+class Clear_Selected_MU(object):
+    def __init__(self):
+        self.label = "Clear Selected MU Initial Pixel Count"
+        self.description = "Description"
+        self.canRunInBackground = False
+
+    def getParameterInfo(self):
+
+        proj_path = arcpy.Parameter(
+            displayName="Selected Project Path",
+            name="in_projpath",
+            datatype="DEFolder",
             parameterType="Required",
             direction="Input"
         )
@@ -59,6 +122,22 @@ class Rules_Setup(object):
         return True
 
     def updateParameters(self, parameters):
+        if parameters[0].value:
+            try:
+                db_url = f"sqlite:///{parameters[0].ValueAsText}//LFTFC_new.sqlite"
+                engine = create_engine(db_url)
+                metadata = MetaData()
+                namtab = Table("DATA_MU_Name", metadata, autoload_with=engine)
+                with engine.connect() as conn:
+                    statement = sqlalchemy.select(namtab.c.Name)
+                    tablesall = conn.execute(statement).all()
+                    tables = [row[0] for row in tablesall]
+                    tables.sort()
+                engine.dispose()
+                parameters[1].filter.list = tables
+            except Exception as e:
+                arcpy.AddWarning(f"Could not read database: {e}")
+                parameters[1].filter.list = []
         return
 
     def updateMessages(self, parameters):
@@ -67,51 +146,113 @@ class Rules_Setup(object):
     def execute(self, parameters, messages):
         proj_path = parameters[0].valueAsText
         mu = parameters[1].valueAsText
-        main_process(proj_path, mu)
 
-class CursorMDB():
-    
-    def __init__(self, in_mdb):
-        self.accpath = in_mdb
-        self._open_engine()
-        
-    def _open_engine(self):
+        clear_mu(proj_path, mu)
 
-        connection_string = (
-            r"DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};"
-            fr"DBQ={self.accpath};"
-            r"ExtendedAnsiSQL=1;")
-        
-        connection_url = sqlalchemy.engine.URL.create(
-            "access+pyodbc",
-            query={"odbc_connect": connection_string})
-        
-        self.mdb_engine = sqlalchemy.create_engine(connection_url)
-        self.mdb_inspector = inspect(self.mdb_engine)
+class export_sqlite_to_csv(object):
+    def __init__(self):
+        self.label = "Export SQLite database to csv files"
+        self.description = "Description"
+        self.canRunInBackground = False
 
-    def get_df(self, tble, sql_query):
+    def getParameterInfo(self):
 
-        # convert mdb field types to df types    
-        schema_info = {}
-        for field in self.mdb_inspector.get_columns(tble):
-            match field['type']:
-                case 'COUNTER':
-                    schema_info[field['name']] = 'int64'
-                case 'INTEGER':
-                    schema_info[field['name']] = 'Int64'
-                case  'FLOAT':
-                    schema_info[field['name']] = 'Float'
-                case _:
-                    schema_info[field['name']] = 'object'
+        proj_path = arcpy.Parameter(
+            displayName="Selected Project Path",
+            name="in_projpath",
+            datatype="DEFolder",
+            parameterType="Required",
+            direction="Input"
+        )
+        dbtab = arcpy.Parameter(
+            displayName="Selected SQLite tables",
+            name="in_sql",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input",
+            multiValue=True
+        )
 
-        self.df = pd.read_sql(sql_query, con=self.mdb_engine)
+        proj_path.value = r"E:\e_GIS\LFTFC\Test_Data_Set"
+        dbtab.filter.type = "ValueList"
 
-        for col, dtype in schema_info.items():
-            self.df[col] = self.df[col].astype(dtype)
-        return self.df      
-    
-    def close_engine(self):
-        self.mdb_engine.dispose()
+        return [proj_path, dbtab]
+
+
+    def isLicensed(self):
+        return True
+
+    def updateParameters(self, parameters):
+        if parameters[0].value:
+            try:
+                db_url = f"sqlite:///{parameters[0].ValueAsText}//LFTFC_new.sqlite"
+                engine = create_engine(db_url)
+                inspector = inspect(engine)
+                tables = inspector.get_table_names()
+                parameters[1].filter.list = tables
+            except Exception as e:
+                arcpy.AddWarning(f"Could not read database: {e}")
+                parameters[1].filter.list = []
+        return
+
+    def updateMessages(self, parameters):
+        return
+
+    def execute(self, parameters, messages):
+        proj_path = parameters[0].valueAsText
+        dbtab = parameters[1].valueAsText
+
+        sqlite_to_csv(proj_path, dbtab)
+
+class import_csv_to_sqlite(object):
+    def __init__(self):
+        self.label = "Import csv files to SQLite database"
+        self.description = "Description"
+        self.canRunInBackground = False
+
+    def getParameterInfo(self):
+
+        proj_path = arcpy.Parameter(
+            displayName="Selected Project Path",
+            name="in_projpath",
+            datatype="DEFolder",
+            parameterType="Required",
+            direction="Input"
+        )
+        csv = arcpy.Parameter(
+            displayName="Selected CSV Files",
+            name="in_csv",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input",
+            multiValue=True
+        )
+
+        return [proj_path, csv]
+
+
+    def isLicensed(self):
+        return True
+
+    def updateParameters(self, parameters):
+        if parameters[0].value:
+            try:
+                csvfolder = Path(os.path.join(parameters[0].ValueAsText, "csv_files"))
+                csv_files = [file.name for file in csvfolder.glob('*.csv')]
+                parameters[1].filter.list = csv_files
+            except Exception as e:
+                arcpy.AddWarning(f"Could not read database: {e}")
+                parameters[1].filter.list = []
+        return
+
+    def updateMessages(self, parameters):
+        return
+
+    def execute(self, parameters, messages):
+        proj_path = parameters[0].valueAsText
+        csv = parameters[1].valueAsText
+
+        csv_to_sqlite(proj_path, csv)
 
 def pip(module_name, package_name=None):
 
@@ -121,18 +262,6 @@ def pip(module_name, package_name=None):
     
     if site.USER_SITE not in sys.path:
         sys.path.append(site.USER_SITE)
-
-def build_mdb_engine(db_path: str):
-    connection_string = (
-        r"DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};"
-        fr"DBQ={db_path};"
-        r"ExtendedAnsiSQL=1;")
-    
-    connection_url = sqlalchemy.engine.URL.create(
-        "access+pyodbc",
-        query={"odbc_connect": connection_string})
-    
-    return sqlalchemy.create_engine(connection_url)
 
 def build_sqlite_engine(db_path: str):
     """
@@ -162,7 +291,7 @@ def _evt_dist_key(evt: int, dist: int) -> str:
     # makes concatenated key of evt and dist
     return f"{int(evt)}{int(dist)}"
 
-def load_master_frames(conn, cmb_df: pd.DataFrame, rules_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, Dict[str, int]]:
+def load_master_frames(cmb_df: pd.DataFrame, rules_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
     
     """
     Read all rows from CMB and Ruleset once into pandas DataFrames.
@@ -360,7 +489,7 @@ def overlap_sum(varC: pd.Series, varE: pd.Series, varW: pd.Series, varEW: pd.Ser
             m = m & p
         return int(df_cmb_g.loc[m, "COUNT"].sum())
 
-    # Branches (translate the VB code exactly)
+    # Branches
     if idC and idE and idW and idEW:
         # Special case: only count if E.BPS != EW.BPS AND W.Wildcard != EW.Wildcard
         if str(varE["BPSRF"]) != str(varEW["BPSRF"]) and str(varW["Wildcard"]) != str(varEW["Wildcard"]):
@@ -531,15 +660,6 @@ def create_sql_engine(in_sqlite: str):
     sql_engine_path = f"sqlite:///{in_sqlite}"
     return create_engine(sql_engine_path, echo=False)
 
-def create_access_engine(mdb_path: str):
-
-    connection_string = (
-        r"access+pyodbc:///?odbc_connect="
-        "Driver={Microsoft Access Driver (*.mdb, *.accdb)};"
-        f"Dbq={mdb_path};"
-    )
-    return create_engine(connection_string)
-
 def full_query(mu):
     rulesR = f"{mu}_Rulesets"
     comboR = f"{mu}_CMB"
@@ -576,35 +696,21 @@ def run_check_count_sql(db, query):
     engine.dispose()
     return value
 
-def run_check_count(db, query):
-    engine = create_access_engine(db)
-    
-    with engine.connect() as conn:
-        value = conn.execute(text(query)).scalar()
-
-    engine.dispose()
-    return value
-
-def run_full_inmemory_update(db_info, outtxt, dbtype = "mdb", use_height_sort: bool = False, debug: bool = False) -> pd.DataFrame:    
+def run_full_inmemory_update(db_info, outtxt, use_height_sort: bool = False, debug: bool = False) -> pd.DataFrame:    
     """
     1) Open engine & connection
     2) Read CMB and Ruleset once
     3) For each (EVT,DIST) group: compute base counts + overlap corrections in memory
     4) Compute Acres/EvtPer
     5) Batch update PixelCount once; commit
-    6) Return tidy DataFrame for inspection/export
+    6) Return DataFrame for inspection/export
     """
     # check should only run on rules where OnOff = "On" and PixelCount = ''  - or - PixelCount Is Null
     arcpy.AddMessage("At the beginning of main run")
     print("At the beginning of main run")
 
-    #engine = build_mdb_engine(db_info.db_path)
-    if dbtype == "mdb":
-        # works with access db
-        engine = create_access_engine(db_info.db_path)
-    else:
-        # works with sqlite db
-        engine = create_sql_engine(db_info.sql_path)
+    # works with sqlite db
+    engine = create_sql_engine(db_info.sql_path)
     arcpy.AddMessage("after engine build")
     print("after engine build")
     
@@ -618,7 +724,7 @@ def run_full_inmemory_update(db_info, outtxt, dbtype = "mdb", use_height_sort: b
         df_rules_all = None
         try:
             # original run with connection to db
-            df_cmb, df_rules = load_master_frames(conn, cmb_table, rules_table)
+            df_cmb, df_rules = load_master_frames(cmb_table, rules_table)
 
             # if df_cmb len is 0, skip to end            
             if len(df_cmb) > 0:
@@ -705,34 +811,64 @@ class DBInfo():
 def popup_message(msg):
     ctypes.windll.user32.MessageBoxW(0, msg, "Toolbox info", 0)
 
-def main_process(proj_path, mu):
-    dbtype = "mdb"
-    #dbtype = "sql"
-
-    # this access plugin fails if pywin32 is not installed in the environment
-    # outtxt = r"E:\e_GIS\LFTFC\code_testing\testscriptinsolution.txt"
+def count_pixels(proj_path, mu):
     outtxt = "" 
  
     db_info = DBInfo(proj_path, mu)
-    strSQLcount = full_query(db_info.mu)    
-
-    #popup_message("in main process")   
+    strSQLcount = full_query(db_info.mu)   
 
     # use sql query prior to loading dataframes
-    # mdb option
-    if dbtype == "mdb":
-        pip('sqlalchemy-access')    
+    empty_rows_count = run_check_count_sql(db_info.sql_path, strSQLcount)
 
-        empty_rows_count = run_check_count(db_info.db_path, strSQLcount)
-        #popup_message(f"num empty rows: {empty_rows_count}")   
-
-    else:
-        # check sqllite option
-        empty_rows_count = run_check_count_sql(db_info.sql_path, strSQLcount)    
-
-    #with open(outtxt, 'a') as f:
-    #    f.write(f"db: {db_info.db_path}, num empty rows: {empty_rows_count}")
+    arcpy.AddMessage(f"empty rows count: {empty_rows_count}")    
 
     if empty_rows_count > 0:
-        #df_out = run_full_inmemory_update(db_path, cmbdf, rulesdf, outtxt, comboR, use_height_sort=False, debug=True)
-        df_out = run_full_inmemory_update(db_info, outtxt, "mdb", use_height_sort=False, debug=False)
+        df_out = run_full_inmemory_update(db_info, outtxt, use_height_sort=False, debug=False)
+
+def clear_mu(proj_path, mu):
+    db_info = DBInfo(proj_path, mu)
+
+    engine = create_sql_engine(db_info.sql_path)
+
+    with engine.connect() as conn:
+        stmt = text(f"UPDATE {db_info.comboR} SET PixelCount = ''")
+        conn.execute(stmt)
+        conn.commit()
+
+def sqlite_to_csv(proj_path, dbtables):
+    db_info = DBInfo(proj_path, "Test")
+
+    # works with sqlite db
+    engine = create_sql_engine(db_info.sql_path)
+
+    csvfolder = os.path.join(proj_path, "csv_files")
+    Path(csvfolder).mkdir(parents=True, exist_ok=True)
+    try:
+        with engine.connect() as conn: 
+            inspector = inspect(conn)
+            sql_table_names = inspector.get_table_names()
+
+            for table in dbtables.split(";"):
+                if table in sql_table_names:
+                    df = pd.read_sql_table(table, conn)
+                    df.to_csv(os.path.join(csvfolder, f"{table}.csv"))
+                else:
+                    arcpy.AddMessage(f"table: {table} not in sqlite db")
+    finally:
+        engine.dispose()
+
+def csv_to_sqlite(proj_path, dbtables):
+    db_info = DBInfo(proj_path, "Test")
+    
+    # works with sqlite db
+    engine = create_sql_engine(db_info.sql_path)
+
+    try:
+        with engine.begin() as conn:
+            for csvfile in dbtables.split(";"):
+                csvname = Path(csvfile).stem
+
+                df = pd.read_csv(os.path.join(proj_path, 'csv_files', csvfile))
+                df.to_sql(csvname, conn, if_exists='replace', index=False)   
+    finally:
+        engine.dispose()

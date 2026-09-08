@@ -1,5 +1,7 @@
 ﻿
 Imports System.Data
+Imports System.Data.SQLite
+Imports System.Linq
 Imports System.IO
 Imports System.Windows
 Imports ArcGIS.Desktop.Core
@@ -11,6 +13,7 @@ Module GeneralSettings
     'Public gs_ThreadCollection As New Collection 'Holds threads to be processed
     Private strProjPath As String = "Not Set"                           'Stores the path
     Private ReadOnly str_LFTFC_DB As String = "\LF_TFC_Toolbar.mdb"     'Stores the name of the database
+    Private ReadOnly str_LFTFC_SQL As String = "LFTFC_new.sqlite"     'Stores the name of the SQLite database
     Private ReadOnly strDBConnection As String = "Provider=Microsoft.ACE.OLEDB.12.0;Persist Security Info=False;Data Source=" 'Stores connection string for ADODB
     'Private pHook As ArcGIS.Desktop.Framework.FrameworkApplicationion                 'ArcMap application
     'Private pApp As ESRI.ArcGIS.Framework.IApplication 'ArcMap application
@@ -20,11 +23,19 @@ Module GeneralSettings
     Private mapLFTFC As Map = Nothing                                   'Stores map
     Private paneLFTFC As Pane = Nothing                                 'Stores map pane
     Private validProject As Boolean = False                             'Flag for valid project
+    Public Const DEFAULT_FUEL_VAL As Integer = 9999
 
     Public ReadOnly Property gs_Install_Path() As String
         Get
             'Make install path constant
             gs_Install_Path = "C:\Landfire\LFTFC_Pro"
+        End Get
+    End Property
+
+    Public ReadOnly Property gs_db_type() As String
+        Get
+            'Set Database type mdb or sqlite
+            gs_db_type = "mdb"
         End Get
     End Property
 
@@ -45,9 +56,22 @@ Module GeneralSettings
         End Set
     End Property
 
+    Public ReadOnly Property gs_LFTFCSQliteName() As String
+        Get
+            gs_LFTFCSQliteName = str_LFTFC_SQL
+        End Get
+    End Property
+
     Public ReadOnly Property gs_LFTFCDBName() As String
         Get
             gs_LFTFCDBName = str_LFTFC_DB
+        End Get
+    End Property
+
+    Public ReadOnly Property gs_LFTFCDatabase() As String
+        Get
+            'gs_LFTFCDatabase = gs_ProjectPath() & "\" & gs_LFTFCSQliteName
+            gs_LFTFCDatabase = Path.Combine(gs_ProjectPath(), gs_LFTFCSQliteName)
         End Get
     End Property
 
@@ -66,42 +90,36 @@ Module GeneralSettings
         End Set
     End Property
 
+
     Public Sub gs_EVTPixelCount(ByVal ComboTable As String, ByVal RulesTable As String,
                                ByRef EVTPixelCountCollection As Collection, ByVal ProjPath As String)
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
-
-        Dim dbconn As New ADODB.Connection                                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        ProjPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
 
         Try
-            'Gets the count of pixels for each EVT
-            strSQL = "SELECT EVTR, DIST, SUM(COUNT) AS TotOfCount " &
-                      "FROM " & ComboTable & " " &
-                      "GROUP BY EVTR, DIST"
-            rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+            Using conn As New SQLiteConnection("Data Source=" & gs_ProjectPath & "\" & gs_LFTFCSQliteName)
+                conn.Open()
 
-            Do Until rs1.EOF
-                EVTPixelCountCollection.Add(rs1.Fields!TotOfCount.Value &
-                "", rs1.Fields!EVTR.Value & rs1.Fields!DIST.Value & "")
-                rs1.MoveNext()
-            Loop
+                Dim strSQL As String =
+                "SELECT EVTR, DIST, SUM(COUNT) AS TotOfCount " &
+                "FROM " & ComboTable & " " &
+                "GROUP BY EVTR, DIST"
 
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
+                Using cmd As New SQLiteCommand(strSQL, conn)
+                    Using rd As SQLiteDataReader = cmd.ExecuteReader()
+                        While rd.Read()
+                            Dim tot As Integer = CInt(rd("TotOfCount"))
+                            Dim key As String = rd("EVTR").ToString() &
+                                           rd("DIST").ToString()
 
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
+                            EVTPixelCountCollection.Add(tot, key)
+                        End While
+                    End Using
+                End Using
+            End Using
+
         Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-
-            MsgBox("Error in gr_MakeRuleset - " & ex.Message)
+            MsgBox("Error in gs_EVTPixelCount - " & ex.Message)
         End Try
+
     End Sub
 
     Public Property gs_MUCount() As Integer
@@ -180,7 +198,7 @@ Module GeneralSettings
             'gs_MUChange = True
             Dim strMPP As String = "" 'Stores which projects pieces are missing
             ' Create a FolderBrowserDialog object
-            Dim FBDialog As New System.Windows.Forms.FolderBrowserDialog
+            Dim FBDialog As New Forms.FolderBrowserDialog
             ' Create the Dialog window
             ' Change the .SelectedPath property to the default location
             With FBDialog
@@ -195,13 +213,15 @@ Module GeneralSettings
                     gs_ProjectPath = .SelectedPath
 
                     'Check for missing project pieces
-                    If System.IO.File.Exists(gs_ProjectPath & "\" & gs_LFTFCDBName) = False Then _
-                            strMPP = vbCrLf & gs_LFTFCDBName
-                    If System.IO.Directory.Exists(gs_ProjectPath & "\" & "Input") = False Then _
+                    If File.Exists(gs_ProjectPath & "\" & gs_LFTFCSQliteName) = False Then _
+                            strMPP = vbCrLf & gs_LFTFCSQliteName
+                    'If File.Exists(gs_ProjectPath & "\" & gs_LFTFCDBName) = False Then _
+                    '        strMPP = vbCrLf & gs_LFTFCDBName
+                    If Directory.Exists(gs_ProjectPath & "\" & "Input") = False Then _
                         strMPP = strMPP & vbCrLf & "- Input Folder"
-                    If System.IO.Directory.Exists(gs_ProjectPath & "\" & "MU") = False Then _
+                    If Directory.Exists(gs_ProjectPath & "\" & "MU") = False Then _
                         strMPP = strMPP & vbCrLf & "- MU Folder"
-                    If System.IO.Directory.Exists(gs_ProjectPath & "\" & "Output") = False Then _
+                    If Directory.Exists(gs_ProjectPath & "\" & "Output") = False Then _
                         strMPP = strMPP & vbCrLf & "- Output Folder"
 
                     'If pieces are missing create a new project
@@ -245,23 +265,43 @@ Module GeneralSettings
         End Get
     End Property
 
+    Private Const LFTFC_MAP_NAME As String = "LFTFC_Pro_map"
+
     Public Async Sub gs_SetActiveLFTFCPane()
-        Await QueuedTask.Run(
-                Sub()
-                    'Check for existing pane before creating a new one
-                    If IsNothing(mapLFTFC) = False Then
-                        If mapLFTFC.GetMapPanes.Count = 0 Then
-                            mapLFTFC.OpenViewAsync()
+        Try
+            'mapLFTFC is module state, so it is Nothing again every time Pro restarts. A
+            'project saved with the map already in it therefore fell through to CreateMap,
+            'and Pro renamed the duplicate to LFTFC_Pro_map1. Look the map up in the
+            'project first and only create one when it genuinely is not there.
+            If mapLFTFC Is Nothing Then
+                mapLFTFC = Await QueuedTask.Run(
+                    Function()
+                        Dim mapItem As MapProjectItem = Project.Current.GetItems(Of MapProjectItem)().FirstOrDefault(
+                            Function(mi) String.Equals(mi.Name, LFTFC_MAP_NAME, StringComparison.OrdinalIgnoreCase))
+
+                        If mapItem IsNot Nothing Then
+                            Return mapItem.GetMap()     'Reuse the map already in the project
                         End If
-                        'This does not seem to set the active map pane
-                        paneLFTFC.Activate()
-                    Else
-                        Dim mapLF = MapFactory.Instance.CreateMap("LFTFC_Pro_map", basemap:=Basemap.None)
-                        ProApp.Panes.CreateMapPaneAsync(mapLF)
-                        mapLFTFC = mapLF
-                        paneLFTFC = ProApp.Panes.ActivePane
-                    End If
-                End Sub)
+
+                        Return MapFactory.Instance.CreateMap(LFTFC_MAP_NAME, basemap:=Basemap.None)
+                    End Function)
+            End If
+
+            'Pane work belongs on the UI thread, not the MCT. Awaiting CreateMapPaneAsync
+            'also gives us the real pane instead of whatever ActivePane happened to be
+            'while the pane was still being created.
+            Dim mapPane As IMapPane = mapLFTFC.GetMapPanes().FirstOrDefault()
+
+            If mapPane Is Nothing Then
+                mapPane = Await ProApp.Panes.CreateMapPaneAsync(mapLFTFC)
+            End If
+
+            paneLFTFC = TryCast(mapPane, Pane)
+            If paneLFTFC IsNot Nothing Then paneLFTFC.Activate()
+
+        Catch ex As Exception
+            MsgBox("Error in gs_SetActiveLFTFCPane - " & ex.Message)
+        End Try
     End Sub
 End Module
 

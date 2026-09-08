@@ -1,4 +1,5 @@
 ﻿Imports System.Data
+Imports System.Data.SQLite
 Imports System.Windows.Forms
 
 Public Class frmAddEdit
@@ -112,6 +113,7 @@ Public Class frmAddEdit
     End Sub
 
     Private Sub cmbCoverLow_SelectionChangeCommitted(ByVal sender As Object, ByVal e As System.EventArgs) Handles cmbCoverLow.SelectionChangeCommitted
+
         Dim TempCH As String = cmbCoverHigh.Text
         Dim TempCH_Code As Integer = gf_ConvertBack(TempCH, strProjectPath)
         Dim TempCL_Code As Integer = gf_ConvertBack(cmbCoverLow.Text, strProjectPath)
@@ -119,207 +121,193 @@ Public Class frmAddEdit
         Dim TempHL_Code As Integer = gf_ConvertBack(cmbHeightLow.Text, strProjectPath)
         Dim TempHH As String = cmbHeightHigh.Text
         Dim TempHH_Code As Integer = gf_ConvertBack(cmbHeightHigh.Text, strProjectPath)
-        Dim bln_SameLifeform As Boolean = True
-        Dim strLifeformCL As String
-        Dim strLifeformTest As String
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
-        Dim rs2 As New ADODB.Recordset                                  'recordset for data
-        Dim rs3 As New ADODB.Recordset                                  'recordset for data
 
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+        Dim bln_SameLifeform As Boolean = True
+        Dim strLifeformCL As String = ""
+        Dim strLifeformTest As String = ""
 
         Try
-            'Clear the contents of the comboboxes
-            cmbCoverHigh.Items.Clear()
-            cmbHeightLow.Items.Clear()
-            cmbHeightHigh.Items.Clear()
+            Using conn As New SQLiteConnection("Data Source=" & strProjectPath & "\" & gs_LFTFCSQliteName)
+                conn.Open()
 
-            'Repopulate the comboboxes
-            PopCovHgt(cmbCoverHigh)
-            PopCovHgt(cmbHeightLow)
-            PopCovHgt(cmbHeightHigh)
+                'Clear the contents of the comboboxes
+                cmbCoverHigh.Items.Clear()
+                cmbHeightLow.Items.Clear()
+                cmbHeightHigh.Items.Clear()
 
-            'Convert code to text cover and height
-            ConvertCodecmbCovHgt()
+                'Repopulate the comboboxes
+                PopCovHgt(cmbCoverHigh)
+                PopCovHgt(cmbHeightLow)
+                PopCovHgt(cmbHeightHigh)
 
-            'Check to see if high cover selection is still valid
-            If TempCH_Code >= TempCL_Code And (TempCH_Code < (Math.Ceiling(TempCL_Code / 10) * 10)) Then 'It still is a valid value
-                cmbCoverHigh.Items.Add(TempCH)
-                cmbCoverHigh.Text = TempCH
-            Else
-                cmbCoverHigh.SelectedIndex = cmbCoverHigh.Items.Count - 1
-            End If
+                'Convert code to text cover and height
+                ConvertCodecmbCovHgt()
 
-            'Check to see if height low selection is still valid
-            'Check to make sure the lifeform is the same
+                '-------------------------------------------------------
+                ' Cover High Validity Check
+                '-------------------------------------------------------
+                If TempCH_Code >= TempCL_Code And (TempCH_Code < (Math.Ceiling(TempCL_Code / 10) * 10)) Then
+                    cmbCoverHigh.Items.Add(TempCH)
+                    cmbCoverHigh.Text = TempCH
+                Else
+                    cmbCoverHigh.SelectedIndex = cmbCoverHigh.Items.Count - 1
+                End If
 
-            'Find lifeform for tempCL_code
-            strSQL = "SELECT LUT_Cover.EVC, LUT_Cover.Lifeform " &
-                     "FROM LUT_Cover WHERE (((LUT_Cover.EVC)=" & TempCL_Code & "))"
-            rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                '-------------------------------------------------------
+                ' Lifeform Lookup for Cover-Low Code (TempCL_Code)
+                '-------------------------------------------------------
+                Using cmd As New SQLiteCommand("SELECT Lifeform FROM LUT_Cover WHERE EVC = @code;", conn)
+                    cmd.Parameters.AddWithValue("@code", TempCL_Code)
+                    Dim result = cmd.ExecuteScalar()
+                    If result IsNot Nothing AndAlso Not IsDBNull(result) Then
+                        strLifeformCL = result.ToString()
+                    End If
+                End Using
 
-            strLifeformCL = rs1.Fields!Lifeform.Value
+                '-------------------------------------------------------
+                ' Lifeform Lookup for Height-Low Code (TempHL_Code)
+                '-------------------------------------------------------
+                Using cmd As New SQLiteCommand("SELECT Lifeform FROM LUT_Height WHERE EVH = @code;", conn)
+                    cmd.Parameters.AddWithValue("@code", TempHL_Code)
+                    Dim result = cmd.ExecuteScalar()
+                    If result IsNot Nothing AndAlso Not IsDBNull(result) Then
+                        strLifeformTest = result.ToString()
+                    End If
+                End Using
 
-            'Find lifeform for tempHL_code
-            strSQL = "SELECT LUT_Height.EVH, LUT_Height.Lifeform " &
-                     "FROM LUT_Height WHERE (((LUT_Height.EVH)=" & TempHL_Code & "))"
-            rs2.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                If strLifeformCL <> strLifeformTest Then bln_SameLifeform = False
 
-            strLifeformTest = rs2.Fields!Lifeform.Value
+                If bln_SameLifeform = True Then
+                    cmbHeightLow.Items.Add(TempHL)
+                    cmbHeightLow.Text = TempHL
+                Else
+                    cmbHeightLow.SelectedIndex = 0
+                End If
 
-            If strLifeformCL <> strLifeformTest Then bln_SameLifeform = False
+                bln_SameLifeform = True 'Reset
 
-            If bln_SameLifeform = True Then
-                cmbHeightLow.Items.Add(TempHL)
-                cmbHeightLow.Text = TempHL
-            Else
-                cmbHeightLow.SelectedIndex = 0
-            End If
+                '-------------------------------------------------------
+                ' Lifeform Lookup for Height-High Code (TempHH_Code)
+                '-------------------------------------------------------
+                Using cmd As New SQLiteCommand("SELECT Lifeform FROM LUT_Height WHERE EVH = @code;", conn)
+                    cmd.Parameters.AddWithValue("@code", TempHH_Code)
+                    Dim result = cmd.ExecuteScalar()
+                    If result IsNot Nothing AndAlso Not IsDBNull(result) Then
+                        strLifeformTest = result.ToString()
+                    End If
+                End Using
 
-            bln_SameLifeform = True                     'Reset to true
+                If strLifeformCL <> strLifeformTest Then bln_SameLifeform = False
 
-            'Check to see if height high selection is still valid
-            'Check to make sure the lifeform is the same
+                '-------------------------------------------------------
+                ' Height-High Validity Check
+                '-------------------------------------------------------
+                If TempHH_Code >= TempHL_Code And bln_SameLifeform = True Then
+                    cmbHeightHigh.Items.Add(TempHH)
+                    cmbHeightHigh.Text = TempHH
+                Else
+                    cmbHeightHigh.SelectedIndex = cmbHeightHigh.Items.Count - 1
+                End If
 
-            'Find lifeform for tempHH_code
-            strSQL = "SELECT LUT_Height.EVH, LUT_Height.Lifeform " &
-                     "FROM LUT_Height WHERE (((LUT_Height.EVH)=" & TempHH_Code & "))"
-            rs3.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+            End Using
 
-            strLifeformTest = rs3.Fields!Lifeform.Value
-
-            If strLifeformCL <> strLifeformTest Then bln_SameLifeform = False
-
-            If TempHH_Code >= TempHL_Code And bln_SameLifeform = True Then 'It still is a valid value
-                cmbHeightHigh.Items.Add(TempHH)
-                cmbHeightHigh.Text = TempHH
-            Else 'It is not in the data check to see if it is higher than height low and adjust if needed
-                cmbHeightHigh.SelectedIndex = cmbHeightHigh.Items.Count - 1
-            End If
-
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-            If rs2.State <> 0 Then rs2.Close()
-            rs2 = Nothing
-            If rs3.State <> 0 Then rs3.Close()
-            rs3 = Nothing
-
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
         Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-            If rs2.State <> 0 Then rs2.Close()
-            rs2 = Nothing
-            If rs3.State <> 0 Then rs3.Close()
-            rs3 = Nothing
-
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
             MsgBox("Error in cmbCoverLow_SelectionChangeCommitted - " & ex.Message)
         End Try
+
     End Sub
 
     Private Sub cmbHeightLow_SelectionChangeCommitted(ByVal sender As Object, ByVal e As System.EventArgs) Handles cmbHeightLow.SelectionChangeCommitted
+
         Dim TempHH_Code As Integer = gf_ConvertBack(cmbHeightHigh.Text, strProjectPath)
         Dim TempHH As String = cmbHeightHigh.Text
         Dim TempHL_Code As Integer = gf_ConvertBack(cmbHeightLow.Text, strProjectPath)
-        Dim bln_SameLifeform As Boolean = True 'Temp values are in the same lifeform or not
-        Dim strLifeformHL As String
-        Dim strLifeformTest As String
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
-        Dim rs2 As New ADODB.Recordset                                  'recordset for data
 
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
+        Dim bln_SameLifeform As Boolean = True
+        Dim strLifeformHL As String = ""
+        Dim strLifeformTest As String = ""
 
         Try
+            Using conn As New SQLiteConnection("Data Source=" & strProjectPath & "\" & gs_LFTFCSQliteName)
+                conn.Open()
 
-            'Clear values
-            cmbHeightHigh.Items.Clear()
+                'Clear values
+                cmbHeightHigh.Items.Clear()
 
-            'Repopulate the comboboxe
-            PopCovHgt(cmbHeightHigh)
+                'Repopulate the combobox
+                PopCovHgt(cmbHeightHigh)
 
-            'Convert code to text cover and height
-            ConvertCodecmbCovHgt()
+                'Convert code to text cover and height
+                ConvertCodecmbCovHgt()
 
-            'Check to see if height high selection is still valid
-            'Check to make sure the lifeform is the same
+                '-------------------------------------------------------
+                ' Look up lifeform for TempHL_Code
+                '-------------------------------------------------------
+                Using cmd As New SQLiteCommand("SELECT Lifeform FROM LUT_Height WHERE EVH = @code;", conn)
+                    cmd.Parameters.AddWithValue("@code", TempHL_Code)
+                    Dim result = cmd.ExecuteScalar()
+                    If result IsNot Nothing AndAlso Not IsDBNull(result) Then
+                        strLifeformHL = result.ToString()
+                    End If
+                End Using
 
-            'Find lifeform for tempHL_code
-            strSQL = "SELECT LUT_Height.EVH, LUT_Height.Lifeform " &
-                     "FROM LUT_Height WHERE (((LUT_Height.EVH)=" & TempHL_Code & "))"
-            rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                '-------------------------------------------------------
+                ' Look up lifeform for TempHH_Code
+                '-------------------------------------------------------
+                Using cmd As New SQLiteCommand("SELECT Lifeform FROM LUT_Height WHERE EVH = @code;", conn)
+                    cmd.Parameters.AddWithValue("@code", TempHH_Code)
+                    Dim result = cmd.ExecuteScalar()
+                    If result IsNot Nothing AndAlso Not IsDBNull(result) Then
+                        strLifeformTest = result.ToString()
+                    End If
+                End Using
 
-            strLifeformHL = rs1.Fields!Lifeform.Value
+                ' Check lifeform match
+                If strLifeformHL <> strLifeformTest Then bln_SameLifeform = False
 
-            'Find lifeform for tempHH_code
-            strSQL = "SELECT LUT_Height.EVH, LUT_Height.Lifeform " &
-                     "FROM LUT_Height WHERE (((LUT_Height.EVH)=" & TempHH_Code & "))"
-            rs2.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                '-------------------------------------------------------
+                ' Validate TempHH_Code
+                '-------------------------------------------------------
+                If TempHH_Code >= TempHL_Code And bln_SameLifeform = True Then
+                    cmbHeightHigh.Items.Add(TempHH)
+                    cmbHeightHigh.Text = TempHH
+                Else
+                    cmbHeightHigh.SelectedIndex = cmbHeightHigh.Items.Count - 1
+                End If
 
-            strLifeformTest = rs2.Fields!Lifeform.Value
+            End Using
 
-            If strLifeformHL <> strLifeformTest Then bln_SameLifeform = False
-
-            If TempHH_Code >= TempHL_Code And bln_SameLifeform = True Then 'It still is a valid value
-                cmbHeightHigh.Items.Add(TempHH)
-                cmbHeightHigh.Text = TempHH
-            Else 'It is not in the data check to see if it is higher than height low and adjust if needed
-                cmbHeightHigh.SelectedIndex = cmbHeightHigh.Items.Count - 1
-            End If
-
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-            If rs2.State <> 0 Then rs2.Close()
-            rs2 = Nothing
-
-
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
         Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-            If rs2.State <> 0 Then rs2.Close()
-            rs2 = Nothing
-
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
             MsgBox("Error in cmbHeightLow_SelectionChangeCommitted - " & ex.Message)
         End Try
 
     End Sub
 
     Private Sub cmdAddSave_Click(ByVal sender As Object, ByVal e As EventArgs) Handles cmdAddSave.Click
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
-
         Try
-            Dim strNewRuleNote As String
-
-            'Convert Canopy Height midpoint to x10
-            If CDbl(cmbCH.Text) > 0 And CDbl(cmbCH.Text) < 100 Then
-                cmbCH.Items.Add(CDbl(cmbCH.Text) * 10)
-                cmbCH.Text = CDbl(cmbCH.Text) * 10
-            Else
-                'Do nothing
+            ' Convert canopy height midpoint to x10 if needed
+            Dim chVal As Double
+            If Double.TryParse(cmbCH.Text, chVal) Then
+                If chVal > 0 AndAlso chVal < 100 Then
+                    Dim newCH As Double = chVal * 10
+                    cmbCH.Items.Add(newCH)
+                    cmbCH.Text = newCH.ToString()
+                End If
             End If
 
-            'Check to make sure all the blanks a filled with values
-            If cmbCoverLow.Text <> "" And cmbCoverHigh.Text <> "" And cmbHeightLow.Text <> "" And
-                cmbHeightHigh.Text <> "" And IsNumeric(txtCBD13x100.Text) And IsNumeric(txtCBD40x100.Text) And
-                IsNumeric(txtCBH13mx10.Text) And IsNumeric(txtCBH40mx10.Text) Then
+            ' Validate required fields
+            If cmbCoverLow.Text <> "" AndAlso cmbCoverHigh.Text <> "" AndAlso
+           cmbHeightLow.Text <> "" AndAlso cmbHeightHigh.Text <> "" AndAlso
+           IsNumeric(txtCBD13x100.Text) AndAlso IsNumeric(txtCBD40x100.Text) AndAlso
+           IsNumeric(txtCBH13mx10.Text) AndAlso IsNumeric(txtCBH40mx10.Text) Then
 
-                'Get Time,date,calibration name and rule that was added to put into the notes for the new rule
-                strNewRuleNote = Now.ToShortTimeString & " " & Now.ToShortDateString & " " & SN & ": NEW RULE  " &
+                ' -------------------------------------------
+                ' Build the note string exactly like original
+                ' -------------------------------------------
+                Dim strNewRuleNote As String =
+                Now.ToShortTimeString & " " &
+                Now.ToShortDateString & " " &
+                SN & ": NEW RULE  " &
                 EVT & "[" & DIST & "]." &
                 Trim(Strings.Right(cmbCoverLow.Text, 3)) & cmbCoverHigh.Text & "." &
                 Strings.Right(cmbHeightLow.Text, Len(cmbHeightLow.Text) - 2) & cmbHeightHigh.Text & "." &
@@ -339,394 +327,444 @@ Public Class frmAddEdit
                 txtCBH40mx10.Text & "." &
                 cmbOnOff.Text
 
-                'This SQL inserts the new rule into the Ruleset table
-                If EVT > 99 Or IsNumeric(cmbCoverLow.Text) = False Then
-                    strSQL = "INSERT INTO " & rulesR & "(EVT, DIST, Cover_Low, Cover_High, Height_Low, Height_High, " &
-                        "BPSRF, Wildcard, FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, CCover, CHeight, CBD13x100, CBD40x100, " &
-                        "CBH13mx10, CBH40mx10, OnOff, Notes) " &
-                        "VALUES (" & EVT & ", " & DIST & ", " &
-                        gf_ConvertBack(cmbCoverLow.Text, strProjectPath) & ", " &
-                        gf_ConvertBack(cmbCoverHigh.Text, strProjectPath) & ", " &
-                        gf_ConvertBack(cmbHeightLow.Text, strProjectPath) & ", " &
-                        gf_ConvertBack(cmbHeightHigh.Text, strProjectPath) & ", '" &
-                        gf_GetNum(cmbBPSRule.Text, "General") & "', '" &
-                        cmbWildRule.Text & "', " &
-                        gf_GetNum(cmbFBFM13.Text, "General") & ", '" &
-                        Trim(Strings.Left(cmbFBFM40.Text, 9)) & "', '" &
-                        Trim(Strings.Left(cmbCanFM.Text, 9)) & "', " &
-                        gf_GetNum(cmbFCCS.Text, "General") & ", " &
-                        gf_GetNum(cmbFLM.Text, "General") & ", " &
-                        gf_GetNum(cmbCanopy.Text, "General") & ", " &
-                        cmbCC.Text & ", " &
-                        cmbCH.Text & ", " &
-                        txtCBD13x100.Text & ", " &
-                        txtCBD40x100.Text & ", " &
-                        txtCBH13mx10.Text & ", " &
-                        txtCBH40mx10.Text & ", '" &
-                        cmbOnOff.Text & "', '" &
-                        strNewRuleNote & "' )"
-                Else 'Deals with rock,water,ag .....
-                    strSQL = "INSERT INTO " & rulesR & "(EVT, DIST, Cover_Low, Cover_High, Height_Low, Height_High, " &
-                        "BPSRF, Wildcard, FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, CCover, CHeight, CBD13x100, CBD40x100, " &
-                        "CBH13mx10, CBH40mx10, OnOff, Notes) " &
-                        "VALUES (" & EVT & ", " & DIST & ", " &
-                        cmbCoverLow.Text & ", " &
-                        cmbCoverHigh.Text & ", " &
-                        cmbHeightLow.Text & ", " &
-                        cmbHeightHigh.Text & ", '" &
-                        gf_GetNum(cmbBPSRule.Text, "General") & "', '" &
-                        cmbWildRule.Text & "', " &
-                        gf_GetNum(cmbFBFM13.Text, "General") & ", '" &
-                        Trim(Strings.Left(cmbFBFM40.Text, 9)) & "', '" &
-                        Trim(Strings.Left(cmbCanFM.Text, 9)) & "', " &
-                        gf_GetNum(cmbFCCS.Text, "General") & ", " &
-                        gf_GetNum(cmbFLM.Text, "General") & ", " &
-                        gf_GetNum(cmbCanopy.Text, "General") & ", " &
-                        cmbCC.Text & ", " &
-                        cmbCH.Text & ", " &
-                        txtCBD13x100.Text & ", " &
-                        txtCBD40x100.Text & ", " &
-                        txtCBH13mx10.Text & ", " &
-                        txtCBH40mx10.Text & ", '" &
-                        cmbOnOff.Text & "', '" &
-                        strNewRuleNote & "' )"
+                ' Need to set these prior to opening conn because gf_ConvertBack uses a connection as well
+                Dim cLowVal As Long
+                Dim cHighVal As Long
+                Dim hLowVal As Long
+                Dim hHighVal As Long
+
+                If EVT > 99 OrElse Not IsNumeric(cmbCoverLow.Text) Then
+                    cLowVal = gf_ConvertBack(cmbCoverLow.Text, strProjectPath)
+                    cHighVal = gf_ConvertBack(cmbCoverHigh.Text, strProjectPath)
+                    hLowVal = gf_ConvertBack(cmbHeightLow.Text, strProjectPath)
+                    hHighVal = gf_ConvertBack(cmbHeightHigh.Text, strProjectPath)
                 End If
 
-                'Open database, run the SQL statement, close the database
-                dbconn.Execute(strSQL)
+                ' -------------------------------------------
+                ' Open SQLite connection
+                ' -------------------------------------------
+                Using conn As New SQLiteConnection("Data Source=" & strProjectPath & "\" & gs_LFTFCSQliteName)
+                    conn.Open()
 
-                'Sleep for one second while the database catches up
+                    ' Build INSERT using parameters (safer than string concatenation)
+                    Dim sql As String =
+                    "INSERT INTO " & rulesR & " (" &
+                    "EVT, DIST, Cover_Low, Cover_High, Height_Low, Height_High, " &
+                    "BPSRF, Wildcard, FBFM13, FBFM40, CanFM, FCCS, FLM, Canopy, " &
+                    "CCover, CHeight, CBD13x100, CBD40x100, CBH13mx10, CBH40mx10, OnOff, Notes) " &
+                    "VALUES (@EVT, @DIST, @CLow, @CHigh, @HLow, @HHigh, @BPSRF, @Wild, @FBFM13, @FBFM40, " &
+                    "@CanFM, @FCCS, @FLM, @Canopy, @CCover, @CHeight, @CBD13, @CBD40, @CBH13, @CBH40, @OnOff, @Notes)"
+
+                    Using cmd As New SQLiteCommand(sql, conn)
+
+                        ' ----- Parameters for both cases -----
+                        cmd.Parameters.AddWithValue("@EVT", EVT)
+                        cmd.Parameters.AddWithValue("@DIST", DIST)
+
+                        ' Cover/Height except EVT special-case
+                        If EVT > 99 OrElse Not IsNumeric(cmbCoverLow.Text) Then
+                            cmd.Parameters.AddWithValue("@CLow", cLowVal)
+                            cmd.Parameters.AddWithValue("@CHigh", cHighVal)
+                            cmd.Parameters.AddWithValue("@HLow", hLowVal)
+                            cmd.Parameters.AddWithValue("@HHigh", hHighVal)
+                        Else
+                            cmd.Parameters.AddWithValue("@CLow", cmbCoverLow.Text)
+                            cmd.Parameters.AddWithValue("@CHigh", cmbCoverHigh.Text)
+                            cmd.Parameters.AddWithValue("@HLow", cmbHeightLow.Text)
+                            cmd.Parameters.AddWithValue("@HHigh", cmbHeightHigh.Text)
+                        End If
+
+                        cmd.Parameters.AddWithValue("@BPSRF", gf_GetNum(cmbBPSRule.Text, "General"))
+                        cmd.Parameters.AddWithValue("@Wild", cmbWildRule.Text)
+                        cmd.Parameters.AddWithValue("@FBFM13", gf_GetNum(cmbFBFM13.Text, "General"))
+                        cmd.Parameters.AddWithValue("@FBFM40", Trim(Strings.Left(cmbFBFM40.Text, 9)))
+                        cmd.Parameters.AddWithValue("@CanFM", Trim(Strings.Left(cmbCanFM.Text, 9)))
+                        cmd.Parameters.AddWithValue("@FCCS", gf_GetNum(cmbFCCS.Text, "General"))
+                        cmd.Parameters.AddWithValue("@FLM", gf_GetNum(cmbFLM.Text, "General"))
+                        cmd.Parameters.AddWithValue("@Canopy", gf_GetNum(cmbCanopy.Text, "General"))
+                        cmd.Parameters.AddWithValue("@CCover", cmbCC.Text)
+                        cmd.Parameters.AddWithValue("@CHeight", cmbCH.Text)
+                        cmd.Parameters.AddWithValue("@CBD13", txtCBD13x100.Text)
+                        cmd.Parameters.AddWithValue("@CBD40", txtCBD40x100.Text)
+                        cmd.Parameters.AddWithValue("@CBH13", txtCBH13mx10.Text)
+                        cmd.Parameters.AddWithValue("@CBH40", txtCBH40mx10.Text)
+                        cmd.Parameters.AddWithValue("@OnOff", cmbOnOff.Text)
+                        cmd.Parameters.AddWithValue("@Notes", strNewRuleNote)
+
+                        cmd.ExecuteNonQuery()
+                        End Using
+                    End Using
+
+                ' Let DB settle if required in your workflow
                 Threading.Thread.Sleep(1000)
 
-                gr_ClearPAP(RulesetCollection) 'Clears the Pixel count, Acres, and Percent evt of the ruleset
+                ' Clear pixel, acres, percent
+                ' gr_ClearPAP(RulesetCollection)
 
-                Visible = False                  'Removes the form
+                ' Close form
+                Visible = False
+
             Else
-                MsgBox("Make sure you fill in all blanks " _
-                       & vbCrLf & "with valid values")
+                MsgBox("Make sure you fill in all blanks" & vbCrLf & "with valid values")
             End If
 
-            If dbconn.State <> ConnectionState.Closed Then                                 'Database needs to be closed
-                dbconn = Nothing
-            End If
         Catch ex As Exception
-            If dbconn.State <> ConnectionState.Closed Then                                 'Database needs to be closed
-                dbconn = Nothing
-            End If
-
             MsgBox("Error in cmdAddSave_Click - " & ex.Message)
         End Try
+
+    End Sub
+
+    ' Helper sub for logging and assigning changes
+    Private Sub AppendChange(ByRef note As String,
+                         oldVal As String,
+                         newVal As String,
+                         updateAction As Action(Of String))
+
+        If oldVal <> newVal Then
+            note &= "  (" & oldVal & ") to (" & newVal & ")"
+            updateAction(newVal)
+        End If
+
     End Sub
 
     Private Sub cmdDone_Click(ByVal sender As Object, ByVal e As System.EventArgs) Handles cmdDone.Click
         Try
-            Dim strNewNote As String
+            Dim chVal As Double
 
-            'Convert Canopy Height range to midpoint
-            'Convert Canopy Height midpoint to x10
-            If CDbl(cmbCH.Text) > 0 And CDbl(cmbCH.Text) < 100 Then
-                cmbCH.Items.Add(CDbl(cmbCH.Text) * 10)
-                cmbCH.Text = CDbl(cmbCH.Text) * 10
-            Else
-                'Do nothing
+            ' Convert Canopy Height midpoint (if needed)
+            If Double.TryParse(cmbCH.Text, chVal) Then
+                If chVal > 0 AndAlso chVal < 100 Then
+                    Dim newCHMid As Double = chVal * 10
+                    cmbCH.Items.Add(newCHMid)
+                    cmbCH.Text = newCHMid.ToString()
+                End If
             End If
 
-            'Create new note string
-            strNewNote = vbCrLf & Now.ToShortTimeString & " " & Now.ToShortDateString & " " &
-                                SN & ": Changed "
+            ' Start new note
+            Dim strNewNote As String =
+            vbCrLf & Now.ToShortTimeString() & " " & Now.ToShortDateString() & " " &
+            SN & ": Changed "
 
-            If ruleAOE.StrCovLow <> cmbCoverLow.Text Then
-                strNewNote = strNewNote & "  (" & ruleAOE.StrCovLow & ") to (" & cmbCoverLow.Text & ")"
-                ruleAOE.StrCovLow = cmbCoverLow.Text
-            End If
+            ' --- Cover Low / High ---
+            AppendChange(strNewNote, ruleAOE.StrCovLow, cmbCoverLow.Text,
+                     Sub(v) ruleAOE.StrCovLow = v)
 
-            If ruleAOE.StrCovHigh <> cmbCoverHigh.Text Then
-                strNewNote = strNewNote & "  (" & ruleAOE.StrCovHigh & " ) to ( " & cmbCoverHigh.Text & ")"
-                ruleAOE.StrCovHigh = cmbCoverHigh.Text
-            End If
+            AppendChange(strNewNote, ruleAOE.StrCovHigh, cmbCoverHigh.Text,
+                     Sub(v) ruleAOE.StrCovHigh = v)
 
-            If ruleAOE.StrHgtLow <> cmbHeightLow.Text Then
-                strNewNote = strNewNote & "  (" & ruleAOE.StrHgtLow & " ) to ( " & cmbHeightLow.Text & ")"
-                ruleAOE.StrHgtLow = cmbHeightLow.Text
-            End If
+            ' --- Height Low / High ---
+            AppendChange(strNewNote, ruleAOE.StrHgtLow, cmbHeightLow.Text,
+                     Sub(v) ruleAOE.StrHgtLow = v)
 
-            If ruleAOE.StrHgtHigh <> cmbHeightHigh.Text Then
-                strNewNote = strNewNote & "  (" & ruleAOE.StrHgtHigh & " ) to ( " & cmbHeightHigh.Text & ")"
-                ruleAOE.StrHgtHigh = cmbHeightHigh.Text
-            End If
+            AppendChange(strNewNote, ruleAOE.StrHgtHigh, cmbHeightHigh.Text,
+                     Sub(v) ruleAOE.StrHgtHigh = v)
 
-            If ruleAOE.BPS <> gf_GetNum(cmbBPSRule.Text, "General") Then
-                strNewNote = strNewNote & "  (" & ruleAOE.BPS & " ) to ( " & gf_GetNum(cmbBPSRule.Text, "General") & ")"
-                ruleAOE.BPS = gf_GetNum(cmbBPSRule.Text, "General")
-            End If
+            ' --- BPS ---
+            Dim newBPS As String = gf_GetNum(cmbBPSRule.Text, "General").ToString()
+            AppendChange(strNewNote, ruleAOE.BPS.ToString(), newBPS,
+                     Sub(v) ruleAOE.BPS = gf_GetNum(v, "General"))
 
-            If ruleAOE.Wildcard <> cmbWildRule.Text Then
-                strNewNote = strNewNote & "  (" & Trim(Strings.Left(ruleAOE.Wildcard, 13)) & " ) to ( " &
-                                                      Trim(Strings.Left(cmbWildRule.Text, 13)) & ")"
-                ruleAOE.Wildcard = cmbWildRule.Text
-            End If
+            ' --- Wildcard ---
+            Dim oldWild As String = Trim(Strings.Left(ruleAOE.Wildcard, 13))
+            Dim newWild As String = Trim(Strings.Left(cmbWildRule.Text, 13))
 
-            If ruleAOE.FBFM13 <> gf_GetNum(cmbFBFM13.Text, "General") Then
-                strNewNote = strNewNote & "  (" & ruleAOE.FBFM13 & " ) to ( " & gf_GetNum(cmbFBFM13.Text, "General") & ")"
-                ruleAOE.FBFM13 = gf_GetNum(cmbFBFM13.Text, "General")
-            End If
+            AppendChange(strNewNote, oldWild, newWild,
+                     Sub(v) ruleAOE.Wildcard = cmbWildRule.Text)
 
-            If ruleAOE.FBFM40 <> Trim(Strings.Left(cmbFBFM40.Text, 9)) Then
-                strNewNote = strNewNote & "  (" & ruleAOE.FBFM40 & " ) to ( " & Trim(Strings.Left(cmbFBFM40.Text, 9)) & ")"
-                ruleAOE.FBFM40 = Trim(Strings.Left(cmbFBFM40.Text, 9))
-            End If
+            ' --- FBFM13 ---
+            Dim newFBFM13 As String = gf_GetNum(cmbFBFM13.Text, "General").ToString()
+            AppendChange(strNewNote, ruleAOE.FBFM13.ToString(), newFBFM13,
+                     Sub(v) ruleAOE.FBFM13 = gf_GetNum(v, "General"))
 
-            If ruleAOE.CanFM <> Trim(Strings.Left(cmbCanFM.Text, 9)) Then
-                strNewNote = strNewNote & "  (" & ruleAOE.CanFM & " ) to ( " & Trim(Strings.Left(cmbCanFM.Text, 9)) & ")"
-                ruleAOE.CanFM = Trim(Strings.Left(cmbCanFM.Text, 9))
-            End If
+            ' --- FBFM40 ---
+            Dim newFBFM40 As String = Trim(Strings.Left(cmbFBFM40.Text, 9))
+            AppendChange(strNewNote, ruleAOE.FBFM40, newFBFM40,
+                     Sub(v) ruleAOE.FBFM40 = newFBFM40)
 
-            If ruleAOE.FCCS <> gf_GetNum(cmbFCCS.Text, "General") Then
-                strNewNote = strNewNote & "  (" & ruleAOE.FCCS & " ) to ( " & gf_GetNum(cmbFCCS.Text, "General") & ")"
-                ruleAOE.FCCS = gf_GetNum(cmbFCCS.Text, "General")
-            End If
+            ' --- CanFM ---
+            Dim newCanFM As String = Trim(Strings.Left(cmbCanFM.Text, 9))
+            AppendChange(strNewNote, ruleAOE.CanFM, newCanFM,
+                     Sub(v) ruleAOE.CanFM = newCanFM)
 
-            If ruleAOE.FLM <> gf_GetNum(cmbFLM.Text, "General") Then
-                strNewNote = strNewNote & "  (" & ruleAOE.FLM & " ) to ( " & gf_GetNum(cmbFLM.Text, "General") & ")"
-                ruleAOE.FLM = gf_GetNum(cmbFLM.Text, "General")
-            End If
+            ' --- FCCS ---
+            Dim newFCCS As String = gf_GetNum(cmbFCCS.Text, "General").ToString()
+            AppendChange(strNewNote, ruleAOE.FCCS.ToString(), newFCCS,
+                     Sub(v) ruleAOE.FCCS = gf_GetNum(v, "General"))
 
-            If ruleAOE.Canopy <> gf_GetNum(cmbCanopy.Text, "General") Then
-                strNewNote = strNewNote & "  (" & ruleAOE.Canopy & " ) to ( " & gf_GetNum(cmbCanopy.Text, "General") & ")"
-                ruleAOE.Canopy = gf_GetNum(cmbCanopy.Text, "General")
-            End If
+            ' --- FLM ---
+            Dim newFLM As String = gf_GetNum(cmbFLM.Text, "General").ToString()
+            AppendChange(strNewNote, ruleAOE.FLM.ToString(), newFLM,
+                     Sub(v) ruleAOE.FLM = gf_GetNum(v, "General"))
 
-            If ruleAOE.CCover <> cmbCC.Text Then
-                strNewNote = strNewNote & "  (" & ruleAOE.CCover & " ) to ( " & cmbCC.Text & ")"
-                ruleAOE.CCover = cmbCC.Text
-            End If
+            ' --- Canopy ---
+            Dim newCanopy As String = gf_GetNum(cmbCanopy.Text, "General").ToString()
+            AppendChange(strNewNote, ruleAOE.Canopy.ToString(), newCanopy,
+                     Sub(v) ruleAOE.Canopy = gf_GetNum(v, "General"))
 
-            If ruleAOE.CHeight <> cmbCH.Text Then
-                strNewNote = strNewNote & "  (" & ruleAOE.CHeight & " ) to ( " & cmbCH.Text & ")"
-                ruleAOE.CHeight = cmbCH.Text
-            End If
+            ' --- CCover / CHeight ---
+            AppendChange(strNewNote, ruleAOE.CCover, cmbCC.Text,
+                     Sub(v) ruleAOE.CCover = v)
 
+            AppendChange(strNewNote, ruleAOE.CHeight, cmbCH.Text,
+                     Sub(v) ruleAOE.CHeight = v)
+
+            ' --- CBD13 ---
             If ruleAOE.CBD13 <> txtCBD13x100.Text Then
                 If IsNumeric(txtCBD13x100.Text) Then
-                    strNewNote = strNewNote & "  (" & ruleAOE.CBD13 & " ) to ( " & txtCBD13x100.Text & ")"
-                    ruleAOE.CBD13 = txtCBD13x100.Text
+                    AppendChange(strNewNote, ruleAOE.CBD13, txtCBD13x100.Text,
+                             Sub(v) ruleAOE.CBD13 = v)
                 Else
                     MsgBox(txtCBD13x100.Text & " is not a valid number")
                 End If
             End If
 
+            ' --- CBD40 ---
             If ruleAOE.CBD40 <> txtCBD40x100.Text Then
                 If IsNumeric(txtCBD40x100.Text) Then
-                    strNewNote = strNewNote & "  (" & ruleAOE.CBD40 & " ) to ( " & txtCBD40x100.Text & ")"
-                    ruleAOE.CBD40 = txtCBD40x100.Text
+                    AppendChange(strNewNote, ruleAOE.CBD40, txtCBD40x100.Text,
+                             Sub(v) ruleAOE.CBD40 = v)
                 Else
                     MsgBox(txtCBD40x100.Text & " is not a valid number")
                 End If
             End If
 
+            ' --- CBH13 ---
             If ruleAOE.CBH13 <> txtCBH13mx10.Text Then
                 If IsNumeric(txtCBH13mx10.Text) Then
-                    strNewNote = strNewNote & "  (" & ruleAOE.CBH13 & " ) to ( " & txtCBH13mx10.Text & ")"
-                    ruleAOE.CBH13 = txtCBH13mx10.Text
+                    AppendChange(strNewNote, ruleAOE.CBH13, txtCBH13mx10.Text,
+                             Sub(v) ruleAOE.CBH13 = v)
                 Else
                     MsgBox(txtCBH13mx10.Text & " is not a valid number")
                 End If
             End If
 
+            ' --- CBH40 (BUG FIXED: valid check must examine txtCBH40mx10) ---
             If ruleAOE.CBH40 <> txtCBH40mx10.Text Then
-                If IsNumeric(txtCBH13mx10.Text) Then
-                    strNewNote = strNewNote & "  (" & ruleAOE.CBH40 & " ) to ( " & txtCBH40mx10.Text & ")"
-                    ruleAOE.CBH40 = txtCBH40mx10.Text
+                If IsNumeric(txtCBH40mx10.Text) Then
+                    AppendChange(strNewNote, ruleAOE.CBH40, txtCBH40mx10.Text,
+                             Sub(v) ruleAOE.CBH40 = v)
                 Else
                     MsgBox(txtCBH40mx10.Text & " is not a valid number")
                 End If
             End If
 
-            If ruleAOE.OnOff <> cmbOnOff.Text Then
-                strNewNote = strNewNote & "  (" & ruleAOE.OnOff & " ) to ( " & cmbOnOff.Text & ")"
-                ruleAOE.OnOff = cmbOnOff.Text
-            End If
-            ruleAOE.Notes = ruleAOE.Notes & strNewNote
+            ' --- On/Off ---
+            AppendChange(strNewNote, ruleAOE.OnOff, cmbOnOff.Text,
+                     Sub(v) ruleAOE.OnOff = v)
 
-            gr_ClearPAP(RulesetCollection) 'Clears the Pixel count, Acres, and Percent evt of the ruleset
+            ' Add final note
+            ruleAOE.Notes &= strNewNote
 
-            Visible = False 'Closes Editor form
+            ' Clear pixel count, acres, percent EVT in ruleset
+            gr_ClearPAP(RulesetCollection)
+
+            Visible = False
+
         Catch ex As Exception
             MsgBox("Error in cmdDone_Click - " & ex.Message)
         End Try
-
     End Sub
 
     Private Sub InitAllCMB()
-        Dim rs1 As New ADODB.Recordset                                  'recordset for data
-        Dim rs2 As New ADODB.Recordset                                  'recordset for data
-
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
 
         Try
-            'Populate Cover low comboboxes with coded values
-            PopCovHgt(cmbCoverLow)
+            Using conn As New SQLiteConnection("Data Source=" & strProjectPath & "\" & gs_LFTFCSQliteName)
+                conn.Open()
 
-            'Populate cover high combo box with coded values
-            If IsNumeric(cmbCoverLow.Items(0)) Then 'This number does not represent cover. It is rock,barren.....
-                cmbCoverHigh.Items.Clear()
-                cmbCoverHigh.Items.Add(cmbCoverLow.Items(0))
-                PopCovHgt(cmbCoverHigh)
-            Else
-                PopCovHgt(cmbCoverHigh)
-            End If
+                'Populate Cover low comboboxes with coded values
+                PopCovHgt(cmbCoverLow)
 
-            'Populate Height low combo boxes with coded values
-            If IsNumeric(cmbCoverLow.Items(0)) Then 'This number does not represent height. It is rock,barren.....
-                If cmbCoverLow.Items(0) < 100 Then
-                    cmbHeightLow.Items.Clear()
-                    cmbHeightLow.Items.Add(cmbCoverLow.Items(0))
-                    PopCovHgt(cmbHeightLow)
+                'Populate cover high combo box with coded values
+                If IsNumeric(cmbCoverLow.Items(0)) Then
+                    cmbCoverHigh.Items.Clear()
+                    cmbCoverHigh.Items.Add(cmbCoverLow.Items(0))
+                    PopCovHgt(cmbCoverHigh)
+                Else
+                    PopCovHgt(cmbCoverHigh)
+                End If
+
+                'Populate Height low combo boxes with coded values
+                If IsNumeric(cmbCoverLow.Items(0)) Then
+                    If cmbCoverLow.Items(0) < 100 Then
+                        cmbHeightLow.Items.Clear()
+                        cmbHeightLow.Items.Add(cmbCoverLow.Items(0))
+                        PopCovHgt(cmbHeightLow)
+                    Else
+                        PopCovHgt(cmbHeightLow)
+                    End If
                 Else
                     PopCovHgt(cmbHeightLow)
                 End If
-            Else
-                PopCovHgt(cmbHeightLow)
-            End If
 
-            'Populate Height high combo boxes with coded values
-            If IsNumeric(cmbCoverLow.Items(0)) Then 'This number does not represent height. It is rock,barren.....
-                If cmbCoverLow.Items(0) < 100 Then
-                    cmbHeightHigh.Items.Clear()
-                    cmbHeightHigh.Items.Add(cmbCoverLow.Items(0))
-                    PopCovHgt(cmbHeightHigh)
+                'Populate Height high combo boxes with coded values
+                If IsNumeric(cmbCoverLow.Items(0)) Then
+                    If cmbCoverLow.Items(0) < 100 Then
+                        cmbHeightHigh.Items.Clear()
+                        cmbHeightHigh.Items.Add(cmbCoverLow.Items(0))
+                        PopCovHgt(cmbHeightHigh)
+                    Else
+                        PopCovHgt(cmbHeightHigh)
+                    End If
                 Else
                     PopCovHgt(cmbHeightHigh)
                 End If
-            Else
-                PopCovHgt(cmbHeightHigh)
-            End If
 
-            'Populate Canopy Cover combobox with coded values
-            strSQL = "SELECT LUT_Cover.MidPoint, LUT_Cover.Lifeform " &
-                     "FROM LUT_Cover WHERE (((LUT_Cover.Lifeform)='Tree'))"
-            rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                '--------------------------------------------------------------------
+                ' Populate Canopy Cover combobox (MidPoint values where Lifeform='Tree')
+                '--------------------------------------------------------------------
+                cmbCC.Items.Clear()
+                cmbCC.Items.Add("9999")
 
-            cmbCC.Items.Add("9999")
-            Do While rs1.EOF <> True
-                cmbCC.Items.Add(rs1.Fields!MidPoint.Value)
-                rs1.MoveNext()
-            Loop
+                Using cmd As New SQLiteCommand(
+                    "SELECT MidPoint 
+                    FROM LUT_Cover 
+                    WHERE Lifeform='Tree'
+                    ORDER BY MidPoint;", conn)
 
-            'Populate Canopy Height combobox with coded values
-            strSQL = "SELECT LUT_Height.MidPoint, LUT_Height.Lifeform " &
-                     "FROM LUT_Height WHERE (((LUT_Height.Lifeform)='Tree'))"
-            rs2.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                    Using reader = cmd.ExecuteReader()
+                        While reader.Read()
+                            cmbCC.Items.Add(reader("MidPoint").ToString())
+                        End While
+                    End Using
+                End Using
 
-            cmbCH.Items.Add("9999")
-            Do While rs2.EOF <> True
-                cmbCH.Items.Add(rs2.Fields!MidPoint.Value)
-                rs2.MoveNext()
-            Loop
+                '--------------------------------------------------------------------
+                ' Populate Canopy Height combobox (MidPoint where Lifeform='Tree')
+                '--------------------------------------------------------------------
+                cmbCH.Items.Clear()
+                cmbCH.Items.Add("9999")
 
-            'Populate the BPSRule box with the new BPSs for the selected EVT
-            cmbBPSRule.Items.Add("any")
+                Using cmd As New SQLiteCommand(
+                    "SELECT MidPoint
+                    FROM LUT_Height
+                    WHERE Lifeform='Tree'
+                    ORDER BY MidPoint;", conn)
 
-            strSQL = "SELECT " & comboR & ".BPSRF, LUT_BPS.Name, LUT_BPS.BPS_Model " &
-                                     "FROM " & comboR & " " &
-                                     "LEFT JOIN LUT_BPS ON " & comboR & ".BPSRF = LUT_BPS.BPS " &
-                                    "WHERE (EVTR = " & EVT &
-                                    " And DIST = " & DIST & ")" &
-                                     " GROUP BY " & comboR & ".BPSRF, LUT_BPS.Name, LUT_BPS.BPS_Model " &
-                                     " ORDER BY BPSRF"
+                    Using reader = cmd.ExecuteReader()
+                        While reader.Read()
+                            cmbCH.Items.Add(reader("MidPoint").ToString())
+                        End While
+                    End Using
+                End Using
 
-            gf_SetControl(cmbBPSRule, strSQL, strProjectPath) 'Fill the cmbBPSRule with value
+                '--------------------------------------------------------------------
+                ' Populate BPSRule combobox using gf_SetControl
+                '--------------------------------------------------------------------
+                cmbBPSRule.Items.Clear()
+                cmbBPSRule.Items.Add("any")
 
-            'Populate the WildRule box with the new Wildcard values for the selected EVT
-            cmbWildRule.Items.Add("any")
+                Dim sqlBPS As String =
+                    "SELECT " & comboR & ".BPSRF, LUT_BPS.Name, LUT_BPS.BPS_Model " &
+                    "FROM " & comboR & " " &
+                    "LEFT JOIN LUT_BPS ON " & comboR & ".BPSRF = LUT_BPS.BPS " &
+                    "WHERE (EVTR = " & EVT & " And DIST = " & DIST & ") " &
+                    "GROUP BY " & comboR & ".BPSRF, LUT_BPS.Name, LUT_BPS.BPS_Model " &
+                    "ORDER BY BPSRF"
 
-            strSQL = "Select " & comboR & ".WILDCARD " &
-                     "FROM(" & comboR & ") " &
-                     "GROUP BY " & comboR & ".WILDCARD, " & comboR & ".EVTR, " & comboR & ".DIST " &
-                     "HAVING(((" & comboR & ".EVTR) = " & EVT & ") And ((" & comboR & ".DIST) = " & DIST & ")) " &
-                     "ORDER BY " & comboR & ".WILDCARD"
+                gf_SetControl(cmbBPSRule, sqlBPS, strProjectPath, theconn:=conn)
 
-            gf_SetControl(cmbWildRule, strSQL, strProjectPath) 'Fill the cmbWildWild with values
+                '--------------------------------------------------------------------
+                ' Populate WildRule combobox using gf_SetControl
+                '--------------------------------------------------------------------
+                cmbWildRule.Items.Clear()
+                cmbWildRule.Items.Add("any")
 
-            'Populate FBFM13 combobox without custom and FBFM40
-            strSQL = "SELECT FMNum, FMName " &
+                Dim sqlWild As String =
+                    "SELECT " & comboR & ".WILDCARD " &
+                    "FROM " & comboR & " " &
+                    "GROUP BY " & comboR & ".WILDCARD, " & comboR & ".EVTR, " & comboR & ".DIST " &
+                    "HAVING ((" & comboR & ".EVTR) = " & EVT & ") AND ((" & comboR & ".DIST) = " & DIST & ") " &
+                    "ORDER BY " & comboR & ".WILDCARD"
+
+                gf_SetControl(cmbWildRule, sqlWild, strProjectPath, theconn:=conn)
+
+                '--------------------------------------------------------------------
+                ' Populate FBFM13 (Anderson13 + Nonburnable)
+                '--------------------------------------------------------------------
+                cmbFBFM13.Items.Clear()
+                cmbFBFM13.Items.Add("9999   Nothing Assigned")
+
+                Dim sqlFBFM13 As String =
+                    "SELECT FMNum, FMName " &
                     "FROM LUT_FuelModelParameters " &
-                    "WHERE (LUT_FuelModelParameters.Creator = 'Anderson13' Or " &
-                    "LUT_FuelModelParameters.Creator = 'Nonburnable') " &
+                    "WHERE Creator='Anderson13' OR Creator='Nonburnable' " &
                     "ORDER BY FMNum"
 
-            cmbFBFM13.Items.Add("9999   Nothing Assigned")
-            gf_SetControl(cmbFBFM13, strSQL, strProjectPath) 'Fill the cmbFBFM13 with values
+                gf_SetControl(cmbFBFM13, sqlFBFM13, strProjectPath, theconn:=conn)
 
-            'Populate FBFM40 combobox without custom and FBFM13
-            strSQL = "SELECT FMNum, FMCode, FMName " &
-                     "FROM LUT_FuelModelParameters " &
-                     "WHERE (LUT_FuelModelParameters.Creator = 'ScottAndBurgan40' Or " &
-                     "LUT_FuelModelParameters.Creator = 'Nonburnable') " &
-                     " ORDER BY FMNum"
+                '--------------------------------------------------------------------
+                ' Populate FBFM40 (Scott&Burgan40 + Nonburnable)
+                '--------------------------------------------------------------------
+                cmbFBFM40.Items.Clear()
+                cmbFBFM40.Items.Add("     9999   Nothing Assigned")
 
-            cmbFBFM40.Items.Add("     9999   Nothing Assigned")
-            gf_SetControl(cmbFBFM40, strSQL, strProjectPath) 'Fill the cmbFBFM40 with values
+                Dim sqlFBFM40 As String =
+                    "SELECT FMNum, FMCode, FMName " &
+                    "FROM LUT_FuelModelParameters " &
+                    "WHERE Creator='ScottAndBurgan40' OR Creator='Nonburnable' " &
+                    "ORDER BY FMNum"
 
-            'Populate CanFM combobox
-            strSQL = "SELECT FM, Description " &
-                     "FROM LUT_Canadian_FBPS_Fuel_Types " &
-                     "WHERE (((LUT_Canadian_FBPS_Fuel_Types.FMID)<>0 And (LUT_Canadian_FBPS_Fuel_Types.FMID)<>-9999)) " &
-                     "ORDER BY ID"
+                gf_SetControl(cmbFBFM40, sqlFBFM40, strProjectPath, theconn:=conn)
 
-            gf_SetControl(cmbCanFM, strSQL, strProjectPath) 'Fill the cmbCanFM with values
+                '--------------------------------------------------------------------
+                ' Populate CanFM
+                '--------------------------------------------------------------------
+                Dim sqlCanFM As String =
+                    "SELECT FM, Description " &
+                    "FROM LUT_Canadian_FBPS_Fuel_Types " &
+                    "WHERE FMID <> 0 AND FMID <> -9999 " &
+                    "ORDER BY ID"
 
-            'Populate FCCS combobox
-            strSQL = "SELECT ID_Num, FCCS, Description " &
-                     "FROM LUT_FCCS_FERA " &
-                     " ORDER BY ID"
+                gf_SetControl(cmbCanFM, sqlCanFM, strProjectPath, theconn:=conn)
 
-            gf_SetControl(cmbFCCS, strSQL, strProjectPath) 'Fill the cmbFCCS with values
+                '--------------------------------------------------------------------
+                ' Populate FCCS
+                '--------------------------------------------------------------------
+                Dim sqlFCCS As String =
+                    "SELECT ID_Num, FCCS, Description " &
+                    "FROM LUT_FCCS_FERA " &
+                    "ORDER BY ID"
 
-            'Populate FLM combobox
-            strSQL = "SELECT FLM, Description " &
-                        "FROM LUT_FLM_Lutes " &
-                        " ORDER BY ID"
+                gf_SetControl(cmbFCCS, sqlFCCS, strProjectPath, theconn:=conn)
 
-            gf_SetControl(cmbFLM, strSQL, strProjectPath) 'Fill the cmbFLM with values
+                '--------------------------------------------------------------------
+                ' Populate FLM
+                '--------------------------------------------------------------------
+                Dim sqlFLM As String =
+                    "SELECT FLM, Description " &
+                    "FROM LUT_FLM_Lutes " &
+                    "ORDER BY ID"
 
-            'Populate Canopy combobox
-            strSQL = "SELECT Canopy_Fuel_Mask, Description " &
-                     "FROM LUT_Canopy_Fuel_Mask " &
-                     " ORDER BY ID"
+                gf_SetControl(cmbFLM, sqlFLM, strProjectPath, theconn:=conn)
 
-            gf_SetControl(cmbCanopy, strSQL, strProjectPath) 'Fill the cmbCanopy with values
+                '--------------------------------------------------------------------
+                ' Populate Canopy
+                '--------------------------------------------------------------------
+                Dim sqlCanopy As String =
+                    "SELECT Canopy_Fuel_Mask, Description " &
+                    "FROM LUT_Canopy_Fuel_Mask " &
+                    "ORDER BY ID"
 
-            'Populate On/Off combobox
-            With cmbOnOff
-                .Items.Add("On")
-                .Items.Add("Off")
-            End With
+                gf_SetControl(cmbCanopy, sqlCanopy, strProjectPath, theconn:=conn)
 
-            'Convert codes for cove rand height comboboxes
-            ConvertCodecmbCovHgt()
+                '--------------------------------------------------------------------
+                ' Populate On/Off
+                '--------------------------------------------------------------------
+                With cmbOnOff
+                    .Items.Clear()
+                    .Items.Add("On")
+                    .Items.Add("Off")
+                End With
 
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-            If rs2.State <> 0 Then rs2.Close()
-            rs2 = Nothing
+                'Convert codes for cover and height comboboxes
+                ConvertCodecmbCovHgt()
 
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
+            End Using
+
         Catch ex As Exception
-            If rs1.State <> 0 Then rs1.Close()
-            rs1 = Nothing
-            If rs2.State <> 0 Then rs2.Close()
-            rs2 = Nothing
-
-            If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-            dbconn = Nothing
-
             MsgBox("Error in InitAllCMB - " & ex.Message)
         End Try
+
     End Sub
 
     Private Sub ConvertCodecmbCovHgt()
@@ -768,223 +806,223 @@ Public Class frmAddEdit
         Next i
     End Sub
 
-    Private Sub PopCovHgt(ByVal cmbBox As ComboBox) 'Used to populate cover and height comboboxes
-        'Declare variables
-        Dim intExistingCovLow As Integer
-        Dim intExistingHgtLow As Integer
-        Dim strLifeForm As String
-        Dim rs1, rs2, rs3, rs4, rs5, rs6 As New ADODB.Recordset         'recordset for data
+    Private Sub PopCovHgt(ByVal cmbBox As ComboBox)
 
-        Dim dbconn As New ADODB.Connection                              'DB connection
-        dbconn.ConnectionString = gs_DBConnection &
-        strProjectPath & "\" & gs_LFTFCDBName
-        dbconn.Open()
-
+        Dim intExistingCovLow As Integer = 0
+        Dim intExistingHgtLow As Integer = 0
+        Dim strLifeForm As String = ""
         Try
-            If cmbBox.Name = "cmbCoverLow" Then 'Populate Low Cover
-                If rdoLim.Checked Then
-                    'Limited - Populate with just the cover values and lifeforms present in the grid
-                    strSQL = "SELECT EVCR " &
-                       "FROM " & comboR & " " &
-                       "WHERE (EVTR = " & EVT & ") And (DIST = " & DIST & ")" &
-                       " Group By EVCR" &
-                       " ORDER BY EVCR"
-                Else
-                    'Unlimited - Populate with all the cover values of all lifeforms
-                    strSQL = "SELECT EVC " &
-                       "FROM LUT_Cover " &
-                       " ORDER BY EVC"
-                End If
+            Using conn As New SQLiteConnection("Data Source=" & strProjectPath & "\" & gs_LFTFCSQliteName)
+                conn.Open()
 
-                gf_SetControl(cmbBox, strSQL, strProjectPath)
+                '-----------------------------------------------------------
+                ' Populate CmbCoverLow (Low Cover)
+                '-----------------------------------------------------------
+                If cmbBox.Name = "cmbCoverLow" Then
 
-            ElseIf cmbBox.Name = "cmbCoverHigh" Then 'Populate High Cover
-
-
-                If Visible = True Then 'Form has already loaded
-                    intExistingCovLow = Int(gf_ConvertBack(cmbCoverLow.SelectedItem, strProjectPath)) 'Gets the code value
-                ElseIf AOE = "Add" Then 'Before form is shown
-                    intExistingCovLow = cmbCoverLow.Items(0)
-                ElseIf AOE = "Edit" Then 'Before form is shown
-                    intExistingCovLow = Int(gf_ConvertBack(cmbCoverLow.Text, strProjectPath)) 'Gets the code value
-                End If
-
-                'Find lifeform from intExistingCovLow
-                strSQL = "SELECT LUT_Cover.EVC, LUT_Cover.Lifeform " &
-                         "FROM LUT_Cover WHERE (((LUT_Cover.EVC)=" & intExistingCovLow & "))"
-                rs1.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-                strLifeForm = rs1.Fields!Lifeform.Value
-
-                If rdoLim.Checked Then
-                    'Liited - Populate with just the cover values, present in the grid, for the selected lifeform
-                    strSQL = "SELECT LUT_Cover.Lifeform, " & comboR & ".EVCR " &
-                             "FROM " & comboR & " " &
-                             "INNER JOIN LUT_Cover ON " & comboR & ".EVCR = LUT_Cover.EVC " &
-                             "WHERE(((" & comboR & ".[EVTR]) = " & EVT & ") AND (" & comboR & ".[DIST] = " & DIST & ") AND " &
-                             "((" & comboR & ".EVCR)>=" & intExistingCovLow & ")) " &
-                             "GROUP BY LUT_Cover.Lifeform, " & comboR & ".EVCR " &
-                             "HAVING (((LUT_Cover.Lifeform)='" & strLifeForm & "')) " &
-                             "ORDER BY " & comboR & ".EVCR"
-
-                    rs2.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-
-                    Do Until rs2.EOF
-                        cmbBox.Items.Add(rs2.Fields!EVCR.Value)
-                        rs2.MoveNext()
-                    Loop
-                Else
-                    'Unlimited - Populate with all the cover values of all lifeforms
-                    strSQL = "SELECT EVC " &
-                       "FROM LUT_Cover " &
-                       " ORDER BY EVC"
-
-                    rs2.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-
-                    Do Until rs2.EOF
-                        cmbBox.Items.Add(rs2.Fields!EVC.Value)
-                        rs2.MoveNext()
-                    Loop
-                End If
-
-            ElseIf cmbBox.Name = "cmbHeightLow" Then 'Populate low heights
-                If Visible = True Then 'Form has already loaded
-                    intExistingCovLow = Int(gf_ConvertBack(cmbCoverLow.SelectedItem, strProjectPath)) 'Gets the code value
-                ElseIf AOE = "Add" Then 'Before form is shown
-                    intExistingCovLow = cmbCoverLow.Items(0)
-                ElseIf AOE = "Edit" Then 'Before form is shown
-                    intExistingCovLow = Int(gf_ConvertBack(cmbCoverLow.Text, strProjectPath)) 'Gets the code value
-                    intExistingHgtLow = Int(gf_ConvertBack(cmbHeightLow.Text, strProjectPath)) 'Gets the code value
-                End If
-
-                'Find lifeform from intExistingCovLow
-                strSQL = "SELECT LUT_Cover.EVC, LUT_Cover.Lifeform " &
-                         "FROM LUT_Cover WHERE (((LUT_Cover.EVC)=" & intExistingCovLow & "))"
-                rs3.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-
-                strLifeForm = rs3.Fields!Lifeform.Value
-
-                If rdoLim.Checked Then
-                    'Limited - Populate with just the height values, present in the grid, for the selected lifeform
-                    strSQL = "SELECT LUT_Height.Lifeform, " & comboR & ".EVHR " &
-                             "FROM " & comboR & " " &
-                             "INNER JOIN LUT_Height ON " & comboR & ".EVHR = LUT_Height.EVH " &
-                             "WHERE((" & comboR & ".[EVTR] = " & EVT & ") And (" & comboR & ".[DIST] = " & DIST & ")) " &
-                             "GROUP BY LUT_Height.Lifeform, " & comboR & ".EVHR " &
-                             "HAVING (LUT_Height.Lifeform ='" & strLifeForm & "') " &
-                             "ORDER BY " & comboR & ".EVHR"
-
-                    rs4.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-
-                    Do Until rs4.EOF
-                        cmbBox.Items.Add(rs4.Fields!EVHR.Value)
-                        rs4.MoveNext()
-                    Loop
-                Else
-                    'Unlimited - Populate with all the cover values of all lifeforms
-                    strSQL = "SELECT EVH " &
-                       "FROM LUT_Height " &
-                       " ORDER BY EVH"
-
-                    rs4.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
-
-                    Do Until rs4.EOF
-                        cmbBox.Items.Add(rs4.Fields!EVH.Value)
-                        rs4.MoveNext()
-                    Loop
-                End If
-
-            ElseIf cmbBox.Name = "cmbHeightHigh" Then 'Populate high heights
-                If Visible = True Then 'Form has already loaded
-                    intExistingCovLow = Int(gf_ConvertBack(cmbCoverLow.SelectedItem, strProjectPath)) 'Gets the code value
-                    If IsNumeric(cmbHeightLow.Text) Then
-                        intExistingHgtLow = cmbHeightLow.Text 'Gets the code value
+                    Dim sql As String
+                    If rdoLim.Checked Then
+                        sql =
+                        "SELECT EVCR FROM " & comboR &
+                        " WHERE EVTR = " & EVT & " AND DIST = " & DIST &
+                        " GROUP BY EVCR ORDER BY EVCR"
                     Else
-                        intExistingHgtLow = Int(gf_ConvertBack(cmbHeightLow.Text, strProjectPath)) 'Gets the code value
+                        sql = "SELECT EVC FROM LUT_Cover ORDER BY EVC"
                     End If
-                ElseIf AOE = "Add" Then 'Before form is shown
-                    intExistingCovLow = cmbCoverLow.Items(0)
-                    intExistingHgtLow = cmbHeightLow.Items(0)
-                ElseIf AOE = "Edit" Then 'Before form is shown
-                    intExistingCovLow = Int(gf_ConvertBack(cmbCoverLow.Text, strProjectPath)) 'Gets the code value
-                    intExistingHgtLow = Int(gf_ConvertBack(cmbHeightLow.Text, strProjectPath)) 'Gets the code value
+
+                    gf_SetControl(cmbBox, sql, strProjectPath, theconn:=conn)
+                    Return
                 End If
 
-                'Find lifeform from intExistingCovLow
-                strSQL = "SELECT LUT_Cover.EVC, LUT_Cover.Lifeform " &
-                         "FROM LUT_Cover WHERE (((LUT_Cover.EVC)=" & intExistingCovLow & "))"
-                rs5.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                '-----------------------------------------------------------
+                ' Populate CmbCoverHigh (High Cover)
+                '-----------------------------------------------------------
+                If cmbBox.Name = "cmbCoverHigh" Then
 
-                strLifeForm = rs5.Fields!Lifeform.Value
+                    'Determine existing low cover selection
+                    If Visible = True Then
+                        intExistingCovLow = gf_ConvertBack(cmbCoverLow.SelectedItem, strProjectPath)
+                    ElseIf AOE = "Add" Then
+                        intExistingCovLow = cmbCoverLow.Items(0)
+                    ElseIf AOE = "Edit" Then
+                        intExistingCovLow = gf_ConvertBack(cmbCoverLow.Text, strProjectPath)
+                    End If
 
-                If rdoLim.Checked Then
-                    'Limited - Populate with just the height values, present in the grid, for the selected lifeform
-                    strSQL = "SELECT LUT_Height.Lifeform, " & comboR & ".EVHR " &
-                             "FROM " & comboR & " " &
-                             "INNER JOIN LUT_Height ON " & comboR & ".EVHR = LUT_Height.EVH " &
-                             "WHERE(((" & comboR & ".[EVTR]) = " & EVT & ") AND (" & comboR & ".[DIST] = " & DIST & ") AND " &
-                             "((" & comboR & ".EVHR)>=" & intExistingHgtLow & ")) " &
-                             "GROUP BY LUT_Height.Lifeform, " & comboR & ".EVHR " &
-                             "HAVING (((LUT_Height.Lifeform)='" & strLifeForm & "')) " &
-                             "ORDER BY " & comboR & ".EVHR"
+                    'Look up lifeform for existing low cover
+                    Using cmd As New SQLiteCommand("SELECT Lifeform FROM LUT_Cover WHERE EVC=@code", conn)
+                        cmd.Parameters.AddWithValue("@code", intExistingCovLow)
+                        Dim result = cmd.ExecuteScalar()
+                        If result IsNot Nothing Then strLifeForm = result.ToString()
+                    End Using
 
-                    rs6.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                    If rdoLim.Checked Then
+                        'Limited → only cover values present in grid for the same lifeform
+                        Dim sql As String =
+                        "SELECT " & comboR & ".EVCR " &
+                        "FROM " & comboR &
+                        " INNER JOIN LUT_Cover ON " & comboR & ".EVCR = LUT_Cover.EVC " &
+                        "WHERE " & comboR & ".EVTR=" & EVT &
+                        " AND " & comboR & ".DIST=" & DIST &
+                        " AND " & comboR & ".EVCR >= " & intExistingCovLow &
+                        " AND LUT_Cover.Lifeform='" & strLifeForm & "' " &
+                        "GROUP BY " & comboR & ".EVCR " &
+                        "ORDER BY " & comboR & ".EVCR"
 
-                    Do Until rs6.EOF
-                        cmbBox.Items.Add(rs6.Fields!EVHR.Value)
-                        rs6.MoveNext()
-                    Loop
-                Else
-                    'Unlimited - Populate with all the cover values of all lifeforms
-                    strSQL = "SELECT EVH " &
-                       "FROM LUT_Height " &
-                       " ORDER BY EVH"
+                        cmbBox.Items.Clear()
+                        Using cmd As New SQLiteCommand(sql, conn)
+                            Using rd = cmd.ExecuteReader()
+                                While rd.Read()
+                                    cmbBox.Items.Add(rd("EVCR"))
+                                End While
+                            End Using
+                        End Using
 
-                    rs6.Open(strSQL, dbconn, ADODB.CursorTypeEnum.adOpenStatic, ADODB.LockTypeEnum.adLockOptimistic)
+                    Else
+                        'Unlimited → all cover values
+                        Dim sql As String = "SELECT EVC FROM LUT_Cover ORDER BY EVC"
+                        cmbBox.Items.Clear()
+                        Using cmd As New SQLiteCommand(sql, conn)
+                            Using rd = cmd.ExecuteReader()
+                                While rd.Read()
+                                    cmbBox.Items.Add(rd("EVC"))
+                                End While
+                            End Using
+                        End Using
+                    End If
 
-                    Do Until rs6.EOF
-                        cmbBox.Items.Add(rs6.Fields!EVH.Value)
-                        rs6.MoveNext()
-                    Loop
+                    Return
                 End If
-            End If
 
-            If dbconn.State <> ConnectionState.Closed Then                                 'Database needs to be closed
-                If rs1.State <> 0 Then rs1.Close()
-                rs1 = Nothing
-                If rs2.State <> 0 Then rs2.Close()
-                rs2 = Nothing
-                If rs3.State <> 0 Then rs3.Close()
-                rs3 = Nothing
-                If rs4.State <> 0 Then rs4.Close()
-                rs4 = Nothing
-                If rs5.State <> 0 Then rs5.Close()
-                rs5 = Nothing
-                If rs6.State <> 0 Then rs6.Close()
-                rs6 = Nothing
+                '-----------------------------------------------------------
+                ' Populate CmbHeightLow (Low Height)
+                '-----------------------------------------------------------
+                If cmbBox.Name = "cmbHeightLow" Then
 
-                If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-                dbconn = Nothing
-            End If
+                    'Determine existing cover/height low selections
+                    If Visible = True Then
+                        intExistingCovLow = gf_ConvertBack(cmbCoverLow.SelectedItem, strProjectPath)
+                    ElseIf AOE = "Add" Then
+                        intExistingCovLow = cmbCoverLow.Items(0)
+                    ElseIf AOE = "Edit" Then
+                        intExistingCovLow = gf_ConvertBack(cmbCoverLow.Text, strProjectPath)
+                        intExistingHgtLow = gf_ConvertBack(cmbHeightLow.Text, strProjectPath)
+                    End If
+
+                    'Lifeform for the selected cover-low
+                    Using cmd As New SQLiteCommand("SELECT Lifeform FROM LUT_Cover WHERE EVC=@code", conn)
+                        cmd.Parameters.AddWithValue("@code", intExistingCovLow)
+                        Dim result = cmd.ExecuteScalar()
+                        If result IsNot Nothing Then strLifeForm = result.ToString()
+                    End Using
+
+                    If rdoLim.Checked Then
+                        'Limited → height values present in grid for same lifeform
+                        Dim sql As String =
+                        "SELECT " & comboR & ".EVHR " &
+                        "FROM " & comboR &
+                        " INNER JOIN LUT_Height ON " & comboR & ".EVHR = LUT_Height.EVH " &
+                        "WHERE " & comboR & ".EVTR=" & EVT &
+                        " AND " & comboR & ".DIST=" & DIST &
+                        " AND LUT_Height.Lifeform='" & strLifeForm & "' " &
+                        "GROUP BY " & comboR & ".EVHR " &
+                        "ORDER BY " & comboR & ".EVHR"
+
+                        cmbBox.Items.Clear()
+                        Using cmd As New SQLiteCommand(sql, conn)
+                            Using rd = cmd.ExecuteReader()
+                                While rd.Read()
+                                    cmbBox.Items.Add(rd("EVHR"))
+                                End While
+                            End Using
+                        End Using
+
+                    Else
+                        'Unlimited → all height values
+                        Dim sql As String = "SELECT EVH FROM LUT_Height ORDER BY EVH"
+                        cmbBox.Items.Clear()
+                        Using cmd As New SQLiteCommand(sql, conn)
+                            Using rd = cmd.ExecuteReader()
+                                While rd.Read()
+                                    cmbBox.Items.Add(rd("EVH"))
+                                End While
+                            End Using
+                        End Using
+                    End If
+
+                    Return
+                End If
+
+                '-----------------------------------------------------------
+                ' Populate CmbHeightHigh (High Height)
+                '-----------------------------------------------------------
+                If cmbBox.Name = "cmbHeightHigh" Then
+
+                    'Determine existing cover and height low selection
+                    If Visible = True Then
+                        intExistingCovLow = gf_ConvertBack(cmbCoverLow.SelectedItem, strProjectPath)
+                        If IsNumeric(cmbHeightLow.Text) Then
+                            intExistingHgtLow = cmbHeightLow.Text
+                        Else
+                            intExistingHgtLow = gf_ConvertBack(cmbHeightLow.Text, strProjectPath)
+                        End If
+                    ElseIf AOE = "Add" Then
+                        intExistingCovLow = cmbCoverLow.Items(0)
+                        intExistingHgtLow = cmbHeightLow.Items(0)
+                    ElseIf AOE = "Edit" Then
+                        intExistingCovLow = gf_ConvertBack(cmbCoverLow.Text, strProjectPath)
+                        intExistingHgtLow = gf_ConvertBack(cmbHeightLow.Text, strProjectPath)
+                    End If
+
+                    'Lifeform from cover-low code
+                    Using cmd As New SQLiteCommand("SELECT Lifeform FROM LUT_Cover WHERE EVC=@code", conn)
+                        cmd.Parameters.AddWithValue("@code", intExistingCovLow)
+                        Dim result = cmd.ExecuteScalar()
+                        If result IsNot Nothing Then strLifeForm = result.ToString()
+                    End Using
+
+                    If rdoLim.Checked Then
+                        'Limited → height values present in grid, same lifeform, >= low height
+                        Dim sql As String =
+                        "SELECT " & comboR & ".EVHR " &
+                        "FROM " & comboR &
+                        " INNER JOIN LUT_Height ON " & comboR & ".EVHR = LUT_Height.EVH " &
+                        "WHERE " & comboR & ".EVTR=" & EVT &
+                        " AND " & comboR & ".DIST=" & DIST &
+                        " AND " & comboR & ".EVHR >= " & intExistingHgtLow &
+                        " AND LUT_Height.Lifeform='" & strLifeForm & "' " &
+                        "GROUP BY " & comboR & ".EVHR " &
+                        "ORDER BY " & comboR & ".EVHR"
+
+                        cmbBox.Items.Clear()
+                        Using cmd As New SQLiteCommand(sql, conn)
+                            Using rd = cmd.ExecuteReader()
+                                While rd.Read()
+                                    cmbBox.Items.Add(rd("EVHR"))
+                                End While
+                            End Using
+                        End Using
+
+                    Else
+                        'Unlimited → all height-high values
+                        Dim sql As String = "SELECT EVH FROM LUT_Height ORDER BY EVH"
+                        cmbBox.Items.Clear()
+                        Using cmd As New SQLiteCommand(sql, conn)
+                            Using rd = cmd.ExecuteReader()
+                                While rd.Read()
+                                    cmbBox.Items.Add(rd("EVH"))
+                                End While
+                            End Using
+                        End Using
+                    End If
+
+                    Return
+                End If
+            End Using
+
         Catch ex As Exception
-            If dbconn.State <> ConnectionState.Closed Then                                 'Database needs to be closed
-                If rs1.State <> 0 Then rs1.Close()
-                rs1 = Nothing
-                If rs2.State <> 0 Then rs2.Close()
-                rs2 = Nothing
-                If rs3.State <> 0 Then rs3.Close()
-                rs3 = Nothing
-                If rs4.State <> 0 Then rs4.Close()
-                rs4 = Nothing
-                If rs5.State <> 0 Then rs5.Close()
-                rs5 = Nothing
-                If rs6.State <> 0 Then rs6.Close()
-                rs6 = Nothing
-
-                If dbconn.State <> ConnectionState.Closed Then dbconn.Close() 'Database needs to be closed
-                dbconn = Nothing
-            End If
-            MsgBox("Error in PopCovHgt_Click - " & ex.Message)
+            MsgBox("Error in PopCovHgt - " & ex.Message)
         End Try
+
     End Sub
 
     Private Sub cmdCancel_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles cmdCancel.Click
