@@ -2381,7 +2381,7 @@ Public Class frmRule
                 cmbFM1.Items.Add("None")
                 cmbFM2.Items.Add("None")
                 cmbFM3.Items.Add("None")
-                cmbFM3.Items.Add("None")
+                cmbFM4.Items.Add("None")
 
                 ' load back all FMNums into the compare FM combos
                 Dim sqlReload As String =

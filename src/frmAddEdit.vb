@@ -109,7 +109,36 @@ Public Class frmAddEdit
                 cmdCancel.Visible = True
             End With
             InitAllCMB()
+
+            'InitAllCMB/PopCovHgt clear and refill the lists, which drops the selections above.
+            'Re-select the rule's values now that the lists are fully populated.
+            SelectRuleValue(cmbCoverLow, ruleAOE.StrCovLow)
+            SelectRuleValue(cmbCoverHigh, ruleAOE.StrCovHigh)
+            SelectRuleValue(cmbHeightLow, ruleAOE.StrHgtLow)
+            SelectRuleValue(cmbHeightHigh, ruleAOE.StrHgtHigh)
+            SelectRuleValue(cmbBPSRule, ruleAOE.BPS)
+            SelectRuleValue(cmbWildRule, ruleAOE.Wildcard)
+            SelectRuleValue(cmbFBFM13, ruleAOE.FBFM13)
+            SelectRuleValue(cmbFBFM40, ruleAOE.FBFM40)
+            SelectRuleValue(cmbCanFM, ruleAOE.CanFM)
+            SelectRuleValue(cmbFCCS, ruleAOE.FCCS)
+            SelectRuleValue(cmbFLM, ruleAOE.FLM)
+            SelectRuleValue(cmbCanopy, ruleAOE.Canopy)
+            SelectRuleValue(cmbCC, ruleAOE.CCover)
+            SelectRuleValue(cmbCH, ruleAOE.CHeight)
+            SelectRuleValue(cmbOnOff, ruleAOE.OnOff)
         End If
+    End Sub
+
+    'Selects value in cmb; inserts it at the top if the populated list doesn't contain it
+    Private Sub SelectRuleValue(ByVal cmb As ComboBox, ByVal value As Object)
+        Dim s As String = SafeStr(value)
+        Dim idx As Integer = cmb.FindStringExact(s)
+        If idx < 0 Then
+            cmb.Items.Insert(0, s)
+            idx = 0
+        End If
+        cmb.SelectedIndex = idx
     End Sub
 
     Private Sub cmbCoverLow_SelectionChangeCommitted(ByVal sender As Object, ByVal e As System.EventArgs) Handles cmbCoverLow.SelectionChangeCommitted
@@ -845,7 +874,7 @@ Public Class frmAddEdit
                     ElseIf AOE = "Add" Then
                         intExistingCovLow = cmbCoverLow.Items(0)
                     ElseIf AOE = "Edit" Then
-                        intExistingCovLow = gf_ConvertBack(cmbCoverLow.Text, strProjectPath)
+                        intExistingCovLow = gf_ConvertBack(ruleAOE.StrCovLow, strProjectPath)
                     End If
 
                     'Look up lifeform for existing low cover
@@ -904,8 +933,8 @@ Public Class frmAddEdit
                     ElseIf AOE = "Add" Then
                         intExistingCovLow = cmbCoverLow.Items(0)
                     ElseIf AOE = "Edit" Then
-                        intExistingCovLow = gf_ConvertBack(cmbCoverLow.Text, strProjectPath)
-                        intExistingHgtLow = gf_ConvertBack(cmbHeightLow.Text, strProjectPath)
+                        intExistingCovLow = gf_ConvertBack(ruleAOE.StrCovLow, strProjectPath)
+                        intExistingHgtLow = gf_ConvertBack(ruleAOE.StrHgtLow, strProjectPath)
                     End If
 
                     'Lifeform for the selected cover-low
@@ -969,8 +998,8 @@ Public Class frmAddEdit
                         intExistingCovLow = cmbCoverLow.Items(0)
                         intExistingHgtLow = cmbHeightLow.Items(0)
                     ElseIf AOE = "Edit" Then
-                        intExistingCovLow = gf_ConvertBack(cmbCoverLow.Text, strProjectPath)
-                        intExistingHgtLow = gf_ConvertBack(cmbHeightLow.Text, strProjectPath)
+                        intExistingCovLow = gf_ConvertBack(ruleAOE.StrCovLow, strProjectPath)
+                        intExistingHgtLow = gf_ConvertBack(ruleAOE.StrHgtLow, strProjectPath)
                     End If
 
                     'Lifeform from cover-low code

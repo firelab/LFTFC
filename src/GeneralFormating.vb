@@ -121,7 +121,8 @@ Module GeneralFormating
             'End Using
             'End Using
 
-            'pControl.Items.Clear()
+            'Do not clear pControl here - callers clear first when needed and some pre-add
+            'leading items ("any", "None", "9999 Nothing Assigned") that must be kept.
 
             If items.Count = 0 Then
                 pControl.Items.Add("N/A")
