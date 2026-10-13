@@ -530,6 +530,8 @@ Public Class frmAddMU
             If txtEVCPath.Text.Contains(":\") Then inRasList += "; " + txtEVCPath.Text
             If txtEVHPath.Text.Contains(":\") Then inRasList += "; " + txtEVHPath.Text
             If txtBPSPath.Text.Contains(":\") Then inRasList += "; " + txtBPSPath.Text
+            'Added wild 10/13/26 was missing
+            If txtWildPath.Text.Contains(":\") Then inRasList += "; " + txtWildPath.Text
 
             DoTheWork(strName, theTopoClips, txtAddMUName.Text, rdoOutGRID.Checked, inRasList) 'Make the combine, add rat to access database, clip Asp, Slp, Ele
 
