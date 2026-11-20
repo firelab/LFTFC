@@ -851,7 +851,7 @@ def sqlite_to_csv(proj_path, dbtables):
             for table in dbtables.split(";"):
                 if table in sql_table_names:
                     df = pd.read_sql_table(table, conn)
-                    df.to_csv(os.path.join(csvfolder, f"{table}.csv"))
+                    df.to_csv(os.path.join(csvfolder, f"{table}.csv"), index=False)
                 else:
                     arcpy.AddMessage(f"table: {table} not in sqlite db")
     finally:
@@ -867,8 +867,32 @@ def csv_to_sqlite(proj_path, dbtables):
         with engine.begin() as conn:
             for csvfile in dbtables.split(";"):
                 csvname = Path(csvfile).stem
+                
+                table = Table(
+                    csvname,
+                    MetaData(),
+                    autoload_with=conn
+                )
+                conn.execute(table.delete())
 
-                df = pd.read_csv(os.path.join(proj_path, 'csv_files', csvfile))
-                df.to_sql(csvname, conn, if_exists='replace', index=False)   
+                try:
+                    df = pd.read_csv(os.path.join(proj_path, 'csv_files', csvfile))
+
+                    if df.empty:
+                        df = None
+                except pd.errors.EmptyDataError:
+                    df = None
+
+                if df is None:
+                    return
+
+                # ID is an autogenerate field that will fail if there are duplicates
+                # so this makes sure they are unique as they go in
+                df = df.drop(columns=["ID"], errors="ignore")
+
+                df.to_sql(csvname, 
+                    conn, 
+                    if_exists='append', 
+                    index=False) 
     finally:
         engine.dispose()

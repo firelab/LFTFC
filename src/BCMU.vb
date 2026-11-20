@@ -47,7 +47,7 @@ Public Class BCMU
                     strSQL = "
                     SELECT Name
                     FROM DATA_MU_Name
-                    ORDER BY Name;
+                    ORDER BY LOWER(Name) ASC;
                 "
 
                     Using cmd As New SQLiteCommand(strSQL, conn)
